@@ -31,7 +31,7 @@ class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
 
   deinit {
     disposePixelBuffer()
-    disposeMPV()
+    dispose()
   }
 
   func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
@@ -68,9 +68,14 @@ class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
     )
   }
 
-  private func disposeMPV() {
+  func dispose() {
+    if renderContext == nil {
+      return
+    }
+
     mpv_render_context_set_update_callback(renderContext, nil, nil)
     mpv_render_context_free(renderContext)
+    renderContext = nil
   }
 
   func resize(_ size: CGSize) {
@@ -100,6 +105,10 @@ class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
   }
 
   func render(_ size: CGSize) {
+    if renderContext == nil {
+      return
+    }
+
     let textureContext = textureContexts.nextAvailable()
     if textureContext == nil {
       return
