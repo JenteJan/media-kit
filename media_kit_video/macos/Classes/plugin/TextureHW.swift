@@ -11,6 +11,7 @@ class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
   private let context: CGLContextObj
   private let textureCache: CVOpenGLTextureCache
   private var renderContext: OpaquePointer?
+  private var redraw = false
   private var textureContexts = SwappableObjectManager<TextureGLContext>(
     objects: [],
     skipCheckArgs: true
@@ -152,20 +153,16 @@ class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       ],
       skipCheckArgs: true
     )
+    redraw = true
   }
 
   private func disposePixelBuffer() {
     textureContexts.reinit(objects: [], skipCheckArgs: true)
   }
 
-  func render(_ size: CGSize) {
+  func render(_ size: CGSize) -> Bool {
     if renderContext == nil {
-      return
-    }
-
-    let textureContext = textureContexts.nextAvailable()
-    if textureContext == nil {
-      return
+      return false
     }
 
     CGLSetCurrentContext(context)
@@ -173,6 +170,21 @@ class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       OpenGLHelpers.checkError("render")
       CGLSetCurrentContext(nil)
     }
+
+    // mpv also notifies without a new frame, and rendering the current one
+    // again repeats the whole shader chain; new pixel buffers still need it
+    // drawn. The update runs with the context current, since it can load the
+    // hardware decoding interop.
+    let update = mpv_render_context_update(renderContext)
+    if update & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) == 0 && !redraw {
+      return false
+    }
+
+    let textureContext = textureContexts.nextAvailable()
+    if textureContext == nil {
+      return false
+    }
+    redraw = false
 
     glBindFramebuffer(GLenum(GL_FRAMEBUFFER), textureContext!.frameBuffer)
     defer {
@@ -196,6 +208,7 @@ class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     glFlush()
 
     textureContexts.pushAsReady(textureContext!)
+    return true
   }
 
   static private func getProcAddress(

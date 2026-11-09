@@ -35,6 +35,8 @@ public class VideoOutput: NSObject {
   private var textureId: Int64 = -1
   private var currentSize: CGSize = CGSize.zero
   private var disposed: Bool = false
+  private let renderLock = NSLock()
+  private var renderPending = false
 
   init(
     handle: Int64,
@@ -87,6 +89,8 @@ public class VideoOutput: NSObject {
     worker.enqueue {
       self.width = width
       self.height = height
+      // A paused player sends no update that would apply the size.
+      self.updateCallback()
     }
   }
 
@@ -158,13 +162,27 @@ public class VideoOutput: NSObject {
     }
   }
 
+  // One queued render serves every notification before it starts,
+  // so a render slower than the notifications does not build a backlog.
   public func updateCallback() {
+    renderLock.lock()
+    let pending = renderPending
+    renderPending = true
+    renderLock.unlock()
+    if pending {
+      return
+    }
+
     worker.enqueue {
       self._updateCallback()
     }
   }
 
   private func _updateCallback() {
+    renderLock.lock()
+    renderPending = false
+    renderLock.unlock()
+
     if disposed {
       return
     }
@@ -186,7 +204,9 @@ public class VideoOutput: NSObject {
       }
     }
 
-    texture.render(size)
+    if !texture.render(size) {
+      return
+    }
     DispatchQueue.main.sync { [weak self] in
       guard let that = self else { return }
       // Textures must be marked as available from the main thread
