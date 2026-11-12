@@ -53,7 +53,21 @@ class ANGLESurfaceManager {
 
   void MakeCurrent(bool value);
 
+  // HDR output: the shared texture becomes R16G16B16A16_FLOAT and |Draw|'s
+  // callback renders into |render_fbo| (half float, linear light), which is
+  // then encoded as extended sRGB times |scale| into the shared texture.
+  // Returns false when this ANGLE cannot do it (no ES 3 or no-config context).
+  bool SetHdr(bool hdr, float scale);
+  bool hdr() const { return hdr_; }
+  // The framebuffer mpv renders into: 0 (the shared texture) unless HDR.
+  uint32_t render_fbo() const { return hdr_ ? hdr_fbo_ : 0; }
+  // Its internal format, for |mpv_opengl_fbo|: 0 (unknown) unless HDR.
+  int32_t render_internal_format() const { return hdr_ ? 0x881A : 0; }
+
  private:
+  bool EnsureHdrResources();
+  void EncodeHdr();
+  void ReleaseHdrResources();
   void SwapBuffers();
 
   void Create();
@@ -83,6 +97,21 @@ class ANGLESurfaceManager {
   EGLDisplay display_ = EGL_NO_DISPLAY;
   EGLContext context_ = nullptr;
   EGLConfig config_ = nullptr;
+  // Half-float config for the HDR shared texture.
+  EGLConfig hdr_config_ = nullptr;
+  // Whether |context_| is an ES 3, no-config context (needed for HDR).
+  bool hdr_capable_ = false;
+  bool hdr_ = false;
+  float hdr_scale_ = 1.0f;
+  // Intermediate half-float target and the encode program.
+  uint32_t hdr_texture_ = 0;
+  uint32_t hdr_fbo_ = 0;
+  int32_t hdr_fbo_width_ = 0;
+  int32_t hdr_fbo_height_ = 0;
+  uint32_t hdr_program_ = 0;
+  uint32_t hdr_vertex_array_ = 0;
+  uint32_t hdr_vertex_buffer_ = 0;
+  int32_t hdr_scale_location_ = -1;
 
   static constexpr EGLint kEGLConfigurationAttributes[] = {
       EGL_RED_SIZE,   8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE,    8,

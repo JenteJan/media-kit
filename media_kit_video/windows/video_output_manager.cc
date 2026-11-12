@@ -27,6 +27,14 @@ void VideoOutputManager::Create(
   }).detach();
 }
 
+bool VideoOutputManager::SetHdr(int64_t handle, bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (video_outputs_.find(handle) == video_outputs_.end()) {
+    return false;
+  }
+  return video_outputs_[handle]->SetHdr(enabled);
+}
+
 void VideoOutputManager::SetSize(int64_t handle,
                                  std::optional<int64_t> width,
                                  std::optional<int64_t> height) {

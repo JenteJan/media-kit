@@ -110,6 +110,22 @@ class NativeVideoController extends PlatformVideoController {
     );
   }
 
+  /// Windows: switches the output to HDR - linear light from mpv encoded for
+  /// Flutter's HDR (scRGB) compositor in a half-float texture - or back.
+  /// Needs an engine with HDR support; returns whether the output is now in
+  /// the requested mode.
+  Future<bool> setHdr(bool enabled) async {
+    final handle = await player.handle;
+    final result = await _channel.invokeMethod<bool>(
+      'VideoOutputManager.SetHdr',
+      {
+        'handle': handle.toString(),
+        'enabled': enabled,
+      },
+    );
+    return result ?? false;
+  }
+
   /// {@macro native_video_controller}
   static Future<PlatformVideoController> create(
     Player player,

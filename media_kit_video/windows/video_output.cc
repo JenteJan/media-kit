@@ -8,7 +8,94 @@
 
 #include "video_output.h"
 
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+
 #include <algorithm>
+#include <string>
+#include <vector>
+
+#pragma comment(lib, "dxgi.lib")
+
+namespace {
+
+// mpv's linear light: 1.0 is its reference white, 203 nits.
+constexpr float kMpvReferenceWhiteNits = 203.0f;
+
+bool EngineSupportsHdr() {
+  HMODULE engine = ::GetModuleHandleW(L"flutter_windows.dll");
+  if (engine == nullptr) {
+    return false;
+  }
+  using SupportsHdr = bool (*)();
+  auto supports = reinterpret_cast<SupportsHdr>(
+      ::GetProcAddress(engine, "FlutterDesktopEngineSupportsHdr"));
+  return supports != nullptr && supports();
+}
+
+// The SDR white and peak, in nits, of the display |window| is on.
+void QueryDisplayLuminance(HWND window, float* sdr_white, float* peak) {
+  *sdr_white = 80.0f;
+  *peak = 1000.0f;
+  HMONITOR monitor = ::MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFOEXW info = {};
+  info.cbSize = sizeof(info);
+  ::GetMonitorInfoW(monitor, &info);
+
+  UINT32 path_count = 0, mode_count = 0;
+  if (::GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count,
+                                    &mode_count) == ERROR_SUCCESS) {
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    if (::QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(),
+                             &mode_count, modes.data(),
+                             nullptr) == ERROR_SUCCESS) {
+      for (UINT32 i = 0; i < path_count; i++) {
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME source = {};
+        source.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+        source.header.size = sizeof(source);
+        source.header.adapterId = paths[i].sourceInfo.adapterId;
+        source.header.id = paths[i].sourceInfo.id;
+        if (::DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+            wcscmp(source.viewGdiDeviceName, info.szDevice) != 0) {
+          continue;
+        }
+        DISPLAYCONFIG_SDR_WHITE_LEVEL white = {};
+        white.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL;
+        white.header.size = sizeof(white);
+        white.header.adapterId = paths[i].targetInfo.adapterId;
+        white.header.id = paths[i].targetInfo.id;
+        if (::DisplayConfigGetDeviceInfo(&white.header) == ERROR_SUCCESS &&
+            white.SDRWhiteLevel > 0) {
+          *sdr_white = white.SDRWhiteLevel / 1000.0f * 80.0f;
+        }
+      }
+    }
+  }
+
+  Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+  if (FAILED(::CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+    return;
+  }
+  Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+  for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND;
+       a++) {
+    Microsoft::WRL::ComPtr<IDXGIOutput> output;
+    for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND;
+         o++) {
+      Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+      DXGI_OUTPUT_DESC1 desc = {};
+      if (SUCCEEDED(output.As(&output6)) &&
+          SUCCEEDED(output6->GetDesc1(&desc)) && desc.Monitor == monitor &&
+          desc.MaxLuminance > 0) {
+        *peak = desc.MaxLuminance;
+        return;
+      }
+    }
+  }
+}
+
+}  // namespace
 
 // Limit the frame size to 1080p in software rendering.
 // This is for performance reasons & to avoid allocating too much memory.
@@ -161,10 +248,10 @@ void VideoOutput::Render() {
     if (surface_manager_ != nullptr) {
       surface_manager_->Draw([&]() {
         mpv_opengl_fbo fbo{
-            0,
+            static_cast<int>(surface_manager_->render_fbo()),
             surface_manager_->width(),
             surface_manager_->height(),
-            0,
+            surface_manager_->render_internal_format(),
         };
         mpv_render_param params[]{
             {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
@@ -307,7 +394,11 @@ void VideoOutput::Resize(int64_t required_width, int64_t required_height) {
     texture->height = texture->visible_height = surface_manager_->height();
     texture->release_context = nullptr;
     texture->release_callback = [](void*) {};
-    texture->format = kFlutterDesktopPixelFormatBGRA8888;
+    // kFlutterDesktopPixelFormatRGBA16Float (3) is only in engines with
+    // FlutterDesktopEngineSupportsHdr; |SetHdr| checks for that.
+    texture->format = surface_manager_->hdr()
+                          ? static_cast<FlutterDesktopPixelFormat>(3)
+                          : kFlutterDesktopPixelFormatBGRA8888;
     auto texture_variant =
         std::make_unique<flutter::TextureVariant>(flutter::GpuSurfaceTexture(
             kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle, [&](auto, auto) {
@@ -361,6 +452,54 @@ void VideoOutput::Resize(int64_t required_width, int64_t required_height) {
     // Notify public texture update callback.
     texture_update_callback_(texture_id_, required_width, required_height);
   }
+}
+
+bool VideoOutput::SetHdr(bool enabled) {
+  if (surface_manager_ == nullptr) {
+    return !enabled;
+  }
+  if (enabled && !EngineSupportsHdr()) {
+    std::cout << "media_kit: VideoOutput: engine has no HDR support"
+              << std::endl;
+    return false;
+  }
+  // The pool's tasks return nothing; the result comes back through this.
+  auto done = std::make_shared<std::promise<bool>>();
+  auto result = done->get_future();
+  thread_pool_ref_->Post([&, done]() {
+    done->set_value([&]() -> bool {
+    float sdr_white = 80.0f, peak = 1000.0f;
+    HWND window = registrar_->GetView() != nullptr
+                      ? registrar_->GetView()->GetNativeWindow()
+                      : nullptr;
+    QueryDisplayLuminance(window, &sdr_white, &peak);
+    if (!surface_manager_->SetHdr(enabled,
+                                  kMpvReferenceWhiteNits / sdr_white)) {
+      return false;
+    }
+    if (enabled) {
+      // Linear BT.709 light for the encode pass, tone mapped to the
+      // display's real peak instead of to SDR.
+      mpv_set_property_string(handle_, "target-trc", "linear");
+      mpv_set_property_string(handle_, "target-prim", "bt.709");
+      mpv_set_property_string(handle_, "target-peak",
+                              std::to_string(static_cast<int>(peak)).c_str());
+    } else {
+      mpv_set_property_string(handle_, "target-trc", "auto");
+      mpv_set_property_string(handle_, "target-prim", "auto");
+      mpv_set_property_string(handle_, "target-peak", "auto");
+    }
+    std::cout << "media_kit: VideoOutput: HDR " << (enabled ? "on" : "off")
+              << ", SDR white " << sdr_white << " nits, peak " << peak
+              << " nits" << std::endl;
+    // A texture of the new format.
+    if (texture_id_) {
+      Resize(surface_manager_->width(), surface_manager_->height());
+    }
+    return true;
+    }());
+  });
+  return result.get();
 }
 
 int64_t VideoOutput::GetVideoWidth() {

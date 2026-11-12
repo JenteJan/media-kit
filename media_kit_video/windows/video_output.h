@@ -76,6 +76,11 @@ class VideoOutput {
 
   void SetSize(std::optional<int64_t> width, std::optional<int64_t> height);
 
+  // HDR output (see |ANGLESurfaceManager::SetHdr|). Only with H/W rendering
+  // on an engine that exports FlutterDesktopEngineSupportsHdr. Returns
+  // whether the output is now in the requested mode.
+  bool SetHdr(bool enabled);
+
  private:
   void NotifyRender();
 

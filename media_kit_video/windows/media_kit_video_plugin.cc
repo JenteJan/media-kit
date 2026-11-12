@@ -10,6 +10,9 @@
 
 #include <Windows.h>
 
+#include <memory>
+#include <thread>
+
 namespace media_kit_video {
 
 MediaKitVideoPlugin* MediaKitVideoPlugin::instance_ = nullptr;
@@ -177,6 +180,20 @@ void MediaKitVideoPlugin::HandleMethodCall(
     auto handle_value = static_cast<int64_t>(std::stoll(handle.c_str()));
     video_output_manager_->Dispose(handle_value);
     result->Success(flutter::EncodableValue(std::monostate{}));
+  } else if (method_call.method_name().compare("VideoOutputManager.SetHdr") ==
+             0) {
+    auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
+    auto handle =
+        std::get<std::string>(arguments[flutter::EncodableValue("handle")]);
+    auto enabled = std::get<bool>(arguments[flutter::EncodableValue("enabled")]);
+    auto handle_value = static_cast<int64_t>(std::stoll(handle.c_str()));
+    // Blocks on the render thread pool; run it off the platform thread.
+    auto shared_result = std::shared_ptr<
+        flutter::MethodResult<flutter::EncodableValue>>(std::move(result));
+    std::thread([this, shared_result, handle_value, enabled]() {
+      auto ok = video_output_manager_->SetHdr(handle_value, enabled);
+      shared_result->Success(flutter::EncodableValue(ok));
+    }).detach();
   } else if (method_call.method_name().compare("VideoOutputManager.SetSize") ==
              0) {
     auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());

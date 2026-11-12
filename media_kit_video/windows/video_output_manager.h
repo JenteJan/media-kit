@@ -36,6 +36,9 @@ class VideoOutputManager {
   // Sets the required video output size.
   // This forces |VideoOutput| to resize the internal OpenGL surface / D3D
   // texture.
+  // Returns whether the output is now in the requested mode.
+  bool SetHdr(int64_t handle, bool enabled);
+
   void SetSize(int64_t handle,
                std::optional<int64_t> width,
                std::optional<int64_t> height);
