@@ -82,6 +82,14 @@ class VideoOutput {
   bool SetHdr(bool enabled);
 
  private:
+  // Points mpv's tone mapping at the headroom the display has above the
+  // user's SDR brightness. Thread pool only.
+  void ApplyHdrBrightness();
+
+  // Frames since |ApplyHdrBrightness| last looked at the display.
+  int hdr_frames_ = 0;
+  // The target-peak last handed to mpv, in mpv's nits; 0 for none.
+  int hdr_target_peak_ = 0;
   void NotifyRender();
 
   void Render();

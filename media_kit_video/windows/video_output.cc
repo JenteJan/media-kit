@@ -19,7 +19,8 @@
 
 namespace {
 
-// mpv's linear light: 1.0 is its reference white, 203 nits.
+// mpv's linear light: 1.0 is HDR reference white ("paper white"), 203 nits
+// (BT.2408).
 constexpr float kMpvReferenceWhiteNits = 203.0f;
 
 bool EngineSupportsHdr() {
@@ -259,6 +260,10 @@ void VideoOutput::Render() {
         };
         mpv_render_context_render(render_context_, params);
       });
+      // The SDR brightness slider can move during a film.
+      if (surface_manager_->hdr() && ++hdr_frames_ >= 120) {
+        ApplyHdrBrightness();
+      }
     }
     // S/W
     if (pixel_buffer_ != nullptr) {
@@ -454,6 +459,30 @@ void VideoOutput::Resize(int64_t required_width, int64_t required_height) {
   }
 }
 
+void VideoOutput::ApplyHdrBrightness() {
+  hdr_frames_ = 0;
+  float sdr_white = 80.0f, peak = 1000.0f;
+  HWND window = registrar_->GetView() != nullptr
+                    ? registrar_->GetView()->GetNativeWindow()
+                    : nullptr;
+  QueryDisplayLuminance(window, &sdr_white, &peak);
+  // The display's headroom above SDR white, in mpv's nits (paper white =
+  // 203): tone mapping fits the film's highlights into it. No headroom (SDR
+  // brightness at or above the panel's peak) leaves plain SDR tone mapping.
+  const float headroom = (std::max)(1.0f, peak / sdr_white);
+  const int target_peak =
+      static_cast<int>(kMpvReferenceWhiteNits * headroom + 0.5f);
+  if (target_peak == hdr_target_peak_) {
+    return;
+  }
+  hdr_target_peak_ = target_peak;
+  mpv_set_property_string(handle_, "target-peak",
+                          std::to_string(target_peak).c_str());
+  std::cout << "media_kit: VideoOutput: HDR headroom " << headroom
+            << "x (SDR white " << sdr_white << " nits, peak " << peak
+            << " nits), mpv target-peak " << target_peak << std::endl;
+}
+
 bool VideoOutput::SetHdr(bool enabled) {
   if (surface_manager_ == nullptr) {
     return !enabled;
@@ -468,30 +497,28 @@ bool VideoOutput::SetHdr(bool enabled) {
   auto result = done->get_future();
   thread_pool_ref_->Post([&, done]() {
     done->set_value([&]() -> bool {
-    float sdr_white = 80.0f, peak = 1000.0f;
-    HWND window = registrar_->GetView() != nullptr
-                      ? registrar_->GetView()->GetNativeWindow()
-                      : nullptr;
-    QueryDisplayLuminance(window, &sdr_white, &peak);
-    if (!surface_manager_->SetHdr(enabled,
-                                  kMpvReferenceWhiteNits / sdr_white)) {
+    // Paper white (mpv's 1.0) is drawn at the user's SDR brightness - the
+    // compositor scales 1.0 to SDR white - so an HDR film is as bright as
+    // everything else on screen, the way Apple, Android and Chrome show HDR,
+    // and only its highlights go beyond. Showing PQ at its absolute level
+    // instead makes films dim whenever the SDR slider is above 203 nits.
+    if (!surface_manager_->SetHdr(enabled, 1.0f)) {
       return false;
     }
     if (enabled) {
-      // Linear BT.709 light for the encode pass, tone mapped to the
-      // display's real peak instead of to SDR.
+      // Linear BT.709 light for the encode pass.
       mpv_set_property_string(handle_, "target-trc", "linear");
       mpv_set_property_string(handle_, "target-prim", "bt.709");
-      mpv_set_property_string(handle_, "target-peak",
-                              std::to_string(static_cast<int>(peak)).c_str());
+      hdr_target_peak_ = 0;
+      ApplyHdrBrightness();
     } else {
       mpv_set_property_string(handle_, "target-trc", "auto");
       mpv_set_property_string(handle_, "target-prim", "auto");
       mpv_set_property_string(handle_, "target-peak", "auto");
+      hdr_target_peak_ = 0;
     }
     std::cout << "media_kit: VideoOutput: HDR " << (enabled ? "on" : "off")
-              << ", SDR white " << sdr_white << " nits, peak " << peak
-              << " nits" << std::endl;
+              << std::endl;
     // A texture of the new format.
     if (texture_id_) {
       Resize(surface_manager_->width(), surface_manager_->height());
