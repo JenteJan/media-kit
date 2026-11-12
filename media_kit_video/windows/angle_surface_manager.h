@@ -58,6 +58,8 @@ class ANGLESurfaceManager {
   // then encoded as extended sRGB times |scale| into the shared texture.
   // Returns false when this ANGLE cannot do it (no ES 3 or no-config context).
   bool SetHdr(bool hdr, float scale);
+  // The encode pass's scale, without recreating anything.
+  void SetHdrScale(float scale);
   bool hdr() const { return hdr_; }
   // The framebuffer mpv renders into: 0 (the shared texture) unless HDR.
   uint32_t render_fbo() const { return hdr_ ? hdr_fbo_ : 0; }

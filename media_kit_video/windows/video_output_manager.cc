@@ -35,6 +35,13 @@ bool VideoOutputManager::SetHdr(int64_t handle, bool enabled) {
   return video_outputs_[handle]->SetHdr(enabled);
 }
 
+void VideoOutputManager::SetHdrPaperWhite(int64_t handle, float nits) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (video_outputs_.find(handle) != video_outputs_.end()) {
+    video_outputs_[handle]->SetHdrPaperWhite(nits);
+  }
+}
+
 void VideoOutputManager::SetSize(int64_t handle,
                                  std::optional<int64_t> width,
                                  std::optional<int64_t> height) {

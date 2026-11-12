@@ -126,6 +126,20 @@ class NativeVideoController extends PlatformVideoController {
     return result ?? false;
   }
 
+  /// Windows: where an HDR film's paper white is drawn, in nits. 203 shows it
+  /// as mastered; higher brightens the picture for a bright room. Kept while
+  /// the output is SDR and applied whenever it is HDR.
+  Future<void> setHdrPaperWhite(double nits) async {
+    final handle = await player.handle;
+    await _channel.invokeMethod(
+      'VideoOutputManager.SetHdrPaperWhite',
+      {
+        'handle': handle.toString(),
+        'nits': nits,
+      },
+    );
+  }
+
   /// {@macro native_video_controller}
   static Future<PlatformVideoController> create(
     Player player,

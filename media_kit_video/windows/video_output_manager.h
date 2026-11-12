@@ -39,6 +39,8 @@ class VideoOutputManager {
   // Returns whether the output is now in the requested mode.
   bool SetHdr(int64_t handle, bool enabled);
 
+  void SetHdrPaperWhite(int64_t handle, float nits);
+
   void SetSize(int64_t handle,
                std::optional<int64_t> width,
                std::optional<int64_t> height);

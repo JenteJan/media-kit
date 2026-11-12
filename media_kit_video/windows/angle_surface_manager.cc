@@ -378,6 +378,12 @@ bool ANGLESurfaceManager::CreateAndBindEGLSurface() {
   return true;
 }
 
+void ANGLESurfaceManager::SetHdrScale(float scale) {
+  ::WaitForSingleObject(mutex_, INFINITE);
+  hdr_scale_ = scale;
+  ::ReleaseMutex(mutex_);
+}
+
 bool ANGLESurfaceManager::SetHdr(bool hdr, float scale) {
   if (hdr && !hdr_capable_) {
     return false;

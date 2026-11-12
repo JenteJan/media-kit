@@ -81,7 +81,15 @@ class VideoOutput {
   // whether the output is now in the requested mode.
   bool SetHdr(bool enabled);
 
+  // Where an HDR film's paper white (BT.2408 reference white) is drawn, in
+  // nits. 203 shows the film as mastered; higher brightens the whole picture
+  // for a bright room, highlights getting what headroom the panel has left.
+  // Kept while SDR, applied whenever HDR is on.
+  void SetHdrPaperWhite(float nits);
+
  private:
+  float hdr_paper_white_ = 203.0f;
+
   // Points mpv's tone mapping at the headroom the display has above the
   // user's SDR brightness. Thread pool only.
   void ApplyHdrBrightness();

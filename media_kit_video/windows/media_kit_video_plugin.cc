@@ -180,6 +180,16 @@ void MediaKitVideoPlugin::HandleMethodCall(
     auto handle_value = static_cast<int64_t>(std::stoll(handle.c_str()));
     video_output_manager_->Dispose(handle_value);
     result->Success(flutter::EncodableValue(std::monostate{}));
+  } else if (method_call.method_name().compare(
+                 "VideoOutputManager.SetHdrPaperWhite") == 0) {
+    auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
+    auto handle =
+        std::get<std::string>(arguments[flutter::EncodableValue("handle")]);
+    auto nits = std::get<double>(arguments[flutter::EncodableValue("nits")]);
+    video_output_manager_->SetHdrPaperWhite(
+        static_cast<int64_t>(std::stoll(handle.c_str())),
+        static_cast<float>(nits));
+    result->Success(flutter::EncodableValue(std::monostate{}));
   } else if (method_call.method_name().compare("VideoOutputManager.SetHdr") ==
              0) {
     auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
