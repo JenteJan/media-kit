@@ -11,6 +11,7 @@ import 'package:safe_local_storage/safe_local_storage.dart';
 import 'package:synchronized/synchronized.dart';
 
 import 'package:media_kit/ffi/src/allocation.dart';
+import 'package:media_kit/src/player/native/utils/engine_id.dart';
 import 'package:media_kit/src/player/native/utils/temp_file.dart';
 import 'package:media_kit/src/values.dart';
 
@@ -123,7 +124,7 @@ class NativeReferenceHolder {
   final File _file = File(
     path.join(
       TempFile.directory,
-      'com.alexmercerind.media_kit.NativeReferenceHolder.$pid',
+      'com.alexmercerind.media_kit.NativeReferenceHolder.$pid${engineId == null ? '' : '.$engineId'}',
     ),
   );
 
