@@ -1,4 +1,4 @@
-// Regression probe for Player.screenshot with direct D3D11 decoding.
+// Regression probe for Player.screenshot with D3D11 and software rendering.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -13,6 +14,9 @@ Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final sources = arguments.where((a) => !a.startsWith('--')).toList();
+  final software = arguments.contains('--software');
+  final cpu = software || arguments.contains('--cpu-decoding');
+  final expectedDecoder = cpu ? 'no' : 'd3d11va';
   final current = ValueNotifier<VideoController?>(null);
   runApp(MaterialApp(
       home: Scaffold(
@@ -36,7 +40,8 @@ Future<void> main(List<String> arguments) async {
       player.stream.log.listen((event) => logs.writeln('$index $event')),
     ];
     final controller = VideoController(player,
-        configuration: const VideoControllerConfiguration(hwdec: 'd3d11va'));
+        configuration: VideoControllerConfiguration(
+            hwdec: cpu ? 'no' : null, enableHardwareAcceleration: !software));
     current.value = controller;
     final native = player.platform as NativePlayer;
     final result = <String, Object?>{
@@ -57,8 +62,9 @@ Future<void> main(List<String> arguments) async {
       final height = int.parse(await native.getProperty('video-out-params/dh'));
       result['expectedSize'] = [width, height];
       result['hwdecBefore'] = await native.getProperty('hwdec-current');
-      if (result['hwdecBefore'] != 'd3d11va') {
-        throw StateError('Direct d3d11va not active');
+      if (result['hwdecBefore'] != expectedDecoder) {
+        throw StateError(
+            'Expected $expectedDecoder, got ${result['hwdecBefore']}');
       }
       if (arguments.contains('--screenshot-sw')) {
         await native.setProperty('screenshot-sw', 'yes');
@@ -121,7 +127,9 @@ Future<void> main(List<String> arguments) async {
             }
           }
           capture['hwdecAfter'] = await native.getProperty('hwdec-current');
-          if (capture['hwdecAfter'] != 'd3d11va') errors.add('Decoder changed');
+          if (capture['hwdecAfter'] != expectedDecoder) {
+            errors.add('Decoder changed');
+          }
         }
       }
       await player.setSubtitleTrack(SubtitleTrack.data(
@@ -149,7 +157,7 @@ Future<void> main(List<String> arguments) async {
       result['hwdecAfter'] = await native.getProperty('hwdec-current');
       if (!player.state.playing ||
           result['positionAdvanced'] != true ||
-          result['hwdecAfter'] != 'd3d11va') {
+          result['hwdecAfter'] != expectedDecoder) {
         errors.add('Playback/decoder changed after screenshots');
       }
     } catch (error, stack) {
@@ -168,4 +176,8 @@ Future<void> main(List<String> arguments) async {
   await File('screenshot-results.json')
       .writeAsString(const JsonEncoder.withIndent('  ').convert(results));
   debugPrint('SCREENSHOT_TEST COMPLETE');
+  if (arguments.contains('--auto')) {
+    await const MethodChannel('media_kit_test/window')
+        .invokeMethod<void>('close');
+  }
 }

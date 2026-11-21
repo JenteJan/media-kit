@@ -1,5 +1,9 @@
 #include "flutter_window.h"
 
+#include <dxgi1_4.h>
+#include <psapi.h>
+#include <wrl/client.h>
+
 #include <optional>
 #include <vector>
 
@@ -85,10 +89,36 @@ bool FlutterWindow::OnCreate() {
                  call.method_name() == "minimize" ? SW_MINIMIZE : SW_RESTORE);
       result->Success();
     } else if (call.method_name() == "metrics") {
+      FILETIME created{}, exited{}, kernel{}, user{};
+      if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) {
+        result->Error("metrics", "GetProcessTimes failed");
+        return;
+      }
+      const auto ticks = [](FILETIME value) {
+        return (static_cast<ULONGLONG>(value.dwHighDateTime) << 32) | value.dwLowDateTime;
+      };
+      PROCESS_MEMORY_COUNTERS_EX memory{};
+      const bool has_memory = GetProcessMemoryInfo(
+          GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory),
+          sizeof(memory)) != FALSE;
+      Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+      adapter.Attach(flutter_controller_->view()->GetGraphicsAdapter());
+      Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+      DXGI_QUERY_VIDEO_MEMORY_INFO video_memory{};
+      const bool has_video_memory =
+          adapter && SUCCEEDED(adapter.As(&adapter3)) &&
+          SUCCEEDED(adapter3->QueryVideoMemoryInfo(
+              0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &video_memory));
       DWORD handles = 0;
       GetProcessHandleCount(GetCurrentProcess(), &handles);
       const auto client = GetClientArea();
       result->Success(flutter::EncodableValue(flutter::EncodableMap{
+          {flutter::EncodableValue("privateBytes"),
+           flutter::EncodableValue(has_memory ? static_cast<int64_t>(memory.PrivateUsage) : -1)},
+          {flutter::EncodableValue("gpuLocalBytes"),
+           flutter::EncodableValue(has_video_memory ? static_cast<int64_t>(video_memory.CurrentUsage) : -1)},
+          {flutter::EncodableValue("cpuUs"),
+           flutter::EncodableValue(static_cast<int64_t>((ticks(kernel) + ticks(user)) / 10))},
           {flutter::EncodableValue("handles"),
            flutter::EncodableValue(static_cast<int64_t>(handles))},
           {flutter::EncodableValue("gdi"),

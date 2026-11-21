@@ -1,115 +1,82 @@
-#include "../angle_surface_manager.h"
+#include "../d3d11_surface_manager.h"
 #include "../thread_pool.h"
 
-#include <atomic>
 #include <iostream>
 #include <stdexcept>
 
-using Generation = ANGLESurfaceManager::TextureGeneration;
+using Microsoft::WRL::ComPtr;
 
 void Check(bool condition, const char* message) {
   if (!condition)
     throw std::runtime_error(message);
 }
 
-void CheckColor(const std::shared_ptr<Generation>& frame, bool red) {
-  frame->Read();
-  std::lock_guard<std::mutex> lock(*frame->mutex);
-  Microsoft::WRL::ComPtr<ID3D11Device> device;
-  frame->destination->GetDevice(&device);
-  D3D11_TEXTURE2D_DESC description{};
-  frame->destination->GetDesc(&description);
-  description.Usage = D3D11_USAGE_STAGING;
-  description.BindFlags = 0;
-  description.MiscFlags = 0;
-  description.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-  Microsoft::WRL::ComPtr<ID3D11Texture2D> staging;
-  Check(SUCCEEDED(device->CreateTexture2D(&description, nullptr, &staging)),
-        "staging texture");
-  frame->context->CopyResource(staging.Get(), frame->destination.Get());
+void Clear(D3D11SurfaceManager& manager,
+           const D3D11SurfaceManager::Surface& frame,
+           bool red) {
+  ComPtr<ID3D11RenderTargetView> view;
+  Check(SUCCEEDED(manager.device()->CreateRenderTargetView(frame.texture.Get(),
+                                                           nullptr, &view)),
+        "create RTV");
+  ComPtr<ID3D11DeviceContext> context;
+  manager.device()->GetImmediateContext(&context);
+  FLOAT color[]{red ? 1.f : 0.f, red ? 0.f : 1.f, 0, 1};
+  context->ClearRenderTargetView(view.Get(), color);
+  manager.WaitForWrites();
+}
+
+void CheckColor(ID3D11Device* consumer, HANDLE handle, UINT width, bool red) {
+  ComPtr<ID3D11Texture2D> imported;
+  Check(
+      SUCCEEDED(consumer->OpenSharedResource(handle, IID_PPV_ARGS(&imported))),
+      "consumer import");
+  D3D11_TEXTURE2D_DESC desc{};
+  imported->GetDesc(&desc);
+  Check(desc.Width == width, "wrong generation");
+  desc.Usage = D3D11_USAGE_STAGING;
+  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  desc.BindFlags = desc.MiscFlags = 0;
+  ComPtr<ID3D11Texture2D> staging;
+  Check(SUCCEEDED(consumer->CreateTexture2D(&desc, nullptr, &staging)),
+        "staging");
+  ComPtr<ID3D11DeviceContext> context;
+  consumer->GetImmediateContext(&context);
+  context->CopyResource(staging.Get(), imported.Get());
   D3D11_MAPPED_SUBRESOURCE mapped{};
-  Check(SUCCEEDED(
-            frame->context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)),
+  Check(SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)),
         "readback");
   const auto* pixel = static_cast<const uint8_t*>(mapped.pData);
   const bool matches =
-      red ? pixel[2] == 255 && pixel[1] == 0 : pixel[1] == 255 && pixel[2] == 0;
-  frame->context->Unmap(staging.Get(), 0);
+      pixel[2] == (red ? 255 : 0) && pixel[1] == (red ? 0 : 255);
+  context->Unmap(staging.Get(), 0);
   Check(matches, "retained generation pixels changed");
 }
 
 int main() {
   try {
-    std::shared_ptr<Generation> old, current;
+    ComPtr<IDXGIFactory> factory;
+    ComPtr<IDXGIAdapter> adapter;
+    Check(SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&factory))) &&
+              SUCCEEDED(factory->EnumAdapters(0, &adapter)),
+          "test adapter");
+    D3D11SurfaceManager consumer(adapter.Get());
+    std::shared_ptr<D3D11SurfaceManager::Surface> old, current;
     {
-      ANGLESurfaceManager manager(64, 36);
-      bool failed = false;
-      try {
-        ANGLESurfaceManager invalid(-1, 0);
-      } catch (const std::runtime_error&) {
-        failed = true;
-      }
-      Check(failed,
-            "invalid construction must fail without affecting live output");
-      manager.Draw([] {
-        glClearColor(1, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-      });
-      old = manager.GetTextureGeneration();
-      for (int attempt = 0; attempt < 3; ++attempt) {
-        failed = false;
-        try {
-          // D3D rejects this size after resize has begun, without allocating a
-          // huge texture. The existing surface must survive the failed call.
-          manager.SetSize(-1, 36);
-        } catch (const std::runtime_error&) {
-          failed = true;
-        }
-        Check(failed && manager.width() == 64 && manager.height() == 36 &&
-                  manager.handle() == old->handle,
-              "failed resize must restore dimensions and shared handle");
-        manager.Draw([] {
-          glClearColor(1, 0, 0, 1);
-          glClear(GL_COLOR_BUFFER_BIT);
-        });
-        CheckColor(old, true);
-      }
-      try {
-        manager.Draw([] { throw std::runtime_error("injected draw failure"); });
-      } catch (const std::runtime_error&) {
-      }
-      Check(eglGetCurrentContext() == EGL_NO_CONTEXT,
-            "failed Draw must unbind the context");
-      manager.SetSize(80, 60);
-      manager.Draw([] {
-        glClearColor(0, 1, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-      });
-      current = manager.GetTextureGeneration();
-      Check(old->handle != current->handle && old->width == 64 &&
-                current->width == 80,
-            "resize must preserve old handle and dimensions");
-      CheckColor(old, true);
-      CheckColor(current, false);
-      // Simulate Flutter asking for a retired registration during repeated
-      // resize/Draw on the rendering worker, then during manager teardown.
-      auto reader = std::async(std::launch::async, [old] {
+      D3D11SurfaceManager producer(adapter.Get());
+      old = producer.CreateSurface(64, 36);
+      Clear(producer, *old, true);
+      auto reader = std::async(std::launch::async, [&] {
         for (int i = 0; i < 100; ++i)
-          CheckColor(old, true);
+          CheckColor(consumer.device(), old->handle, 64, true);
       });
       for (int i = 0; i < 100; ++i) {
-        manager.SetSize(80 + i % 2, 60);
-        manager.Draw([] {
-          glClearColor(0, 1, 0, 1);
-          glClear(GL_COLOR_BUFFER_BIT);
-        });
+        current = producer.CreateSurface(80, 60);
+        Clear(producer, *current, false);
       }
       reader.get();
     }
-    CheckColor(old, true);
-    CheckColor(current, false);
-    old.reset();
-    current.reset();
+    CheckColor(consumer.device(), old->handle, 64, true);
+    CheckColor(consumer.device(), current->handle, 80, false);
 
     std::vector<int> order;
     {

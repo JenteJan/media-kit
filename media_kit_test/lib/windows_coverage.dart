@@ -17,6 +17,7 @@ void main(List<String> arguments) {
     home: CoverageScreen(
       sources: arguments.where((a) => !a.startsWith('--')).toList(),
       software: arguments.contains('--software'),
+      cpuDecoding: arguments.contains('--cpu-decoding'),
       rotationOnly: arguments.contains('--rotation-only'),
     ),
   ));
@@ -25,11 +26,13 @@ void main(List<String> arguments) {
 class CoverageScreen extends StatefulWidget {
   final List<String> sources;
   final bool software;
+  final bool cpuDecoding;
   final bool rotationOnly;
   const CoverageScreen(
       {super.key,
       required this.sources,
       required this.software,
+      required this.cpuDecoding,
       this.rotationOnly = false});
 
   @override
@@ -53,8 +56,13 @@ class _CoverageScreenState extends State<CoverageScreen> {
   final viewportKey = GlobalKey();
   BoxFit? probeFit;
   String status = 'Starting';
-  String get hwdec => widget.software ? 'no' : 'd3d11va';
-  String get mode => widget.software ? 'sw-cpu' : 'hw';
+  String? get hwdec => widget.software || widget.cpuDecoding ? 'no' : null;
+  String get expectedDecoder => hwdec ?? 'd3d11va';
+  String get mode => widget.software
+      ? 'sw-cpu'
+      : widget.cpuDecoding
+          ? 'd3d11-cpu'
+          : 'hw';
   late final void Function(FlutterErrorDetails)? previousError;
 
   @override
@@ -230,7 +238,7 @@ class _CoverageScreenState extends State<CoverageScreen> {
         }
         final native = slot.player.platform as NativePlayer;
         final decoder = await native.getProperty('hwdec-current');
-        check(decoder == hwdec, 'Requested $hwdec, actual $decoder');
+        check(decoder == expectedDecoder, 'Requested $hwdec, actual $decoder');
         record('Source switch', {
           'fixed': fixed,
           'codec': await native.getProperty('current-tracks/video/codec'),
@@ -324,7 +332,7 @@ class _CoverageScreenState extends State<CoverageScreen> {
         await slot.player.open(Media(source));
         await waitFor(() => slot.player.state.position.inMilliseconds > 100,
             'rotated source playing');
-        check(await native.getProperty('hwdec-current') == hwdec,
+        check(await native.getProperty('hwdec-current') == expectedDecoder,
             'Rotation changed the decoder');
         check(await native.getProperty('current-tracks/video/codec') == codec,
             'Unexpected rotation fixture codec');
@@ -384,7 +392,7 @@ class _CoverageScreenState extends State<CoverageScreen> {
             'degrees': degrees,
             'fixed': fixed,
             'network': source.startsWith('http'),
-            'hwdec': hwdec,
+            'hwdec': expectedDecoder,
           });
           final screenshot = await slot.player.screenshot(format: 'image/png');
           check(screenshot != null && screenshot.isNotEmpty,

@@ -15,7 +15,7 @@
 
 #include <client.h>
 #include <render.h>
-#include <render_gl.h>
+#include <render_d3d11.h>
 
 #include <future>
 #include <memory>
@@ -24,14 +24,14 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
-#include "angle_surface_manager.h"
+#include "d3d11_surface_manager.h"
 #include "thread_pool.h"
 #include "video_frame_size.h"
 
 typedef struct _VideoOutputConfiguration {
   std::optional<int64_t> width;
   std::optional<int64_t> height;
-  // Prefers OpenGL/ANGLE rendering, with software rendering as fallback.
+  // Prefers D3D11 rendering, with software rendering as fallback.
   // Hardware video decoding is configured separately through mpv.
   bool enable_hardware_acceleration;
 
@@ -51,7 +51,8 @@ class VideoOutput {
               VideoOutputConfiguration configuration,
               flutter::TextureRegistrar* registrar,
               ThreadPool* thread_pool_ref,
-              const std::atomic<bool>* shutting_down = nullptr);
+              const std::atomic<bool>* shutting_down = nullptr,
+              IDXGIAdapter* adapter = nullptr);
 
   ~VideoOutput();
 
@@ -67,7 +68,11 @@ class VideoOutput {
  private:
   struct Frame {
     media_kit::VideoFrameSize size;
-    std::shared_ptr<ANGLESurfaceManager::TextureGeneration> gpu;
+    std::shared_ptr<D3D11SurfaceManager::Surface> first_target;
+    // latest is published atomically by the worker. imported and the
+    // descriptor are accessed exclusively on Flutter's raster thread.
+    std::shared_ptr<D3D11SurfaceManager::Surface> latest;
+    std::shared_ptr<D3D11SurfaceManager::Surface> imported;
     std::vector<uint8_t> pixels;
     std::mutex pixels_mutex;
     FlutterDesktopGpuSurfaceDescriptor gpu_descriptor{};
@@ -87,7 +92,10 @@ class VideoOutput {
 
   void CheckAndResize();
 
-  void Resize(int64_t required_width, int64_t required_height);
+  void Resize(
+      int64_t required_width,
+      int64_t required_height,
+      std::shared_ptr<D3D11SurfaceManager::Surface> first_target = nullptr);
 
   std::optional<media_kit::VideoFrameSize> GetVideoSize();
 
@@ -106,8 +114,10 @@ class VideoOutput {
   std::mutex notification_mutex_;
   bool render_queued_ = false;  // Protected by notification_mutex_.
   std::atomic<bool> destroyed_{false};
-  std::unique_ptr<ANGLESurfaceManager> surface_manager_;
+  std::unique_ptr<D3D11SurfaceManager> surface_manager_;
   bool software_ = false;
+  int software_rotation_ = 0;
+  std::vector<uint8_t> unrotated_pixels_;
   std::shared_ptr<TextureRegistration> texture_;
   // Unregister callbacks own only their generation, never this output.
   std::vector<std::future<void>> retirements_;

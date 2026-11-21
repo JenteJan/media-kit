@@ -60,25 +60,25 @@ function(download_and_verify_sha256 url sha256 locationForArchive)
   message(STATUS "${locationForArchive} SHA-256 verification successful.")
 endfunction()
 
-# Find 7zip for extracting the libmpv and ANGLE archives.
+# Find 7zip for extracting the libmpv archive.
 find_program(SEVENZ_EXECUTABLE NAMES 7z 7za)
 
 # libmpv 0.42.0 release artifacts.
-set(LIBMPV_RELEASE "20261118")
-set(LIBMPV_BUILD_DATE "20261118")
+set(LIBMPV_RELEASE "20261123")
+set(LIBMPV_BUILD_DATE "20261123")
 set(LIBMPV_REVISION_SHORT "b0841e8c4d")
 
 if("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-x64")
   set(LIBMPV_ARCH "x86_64")
   set(
     LIBMPV_SHA256
-    "6c4bfbcdfeb1ddfd9b6578431cb4fe145d63134f808963d404764f34e7d4ec1d"
+    "558c47ce08d39bd27d060363c57907604fde7c6d5f7b09e50dc7b04da2a46300"
   )
 elseif("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-arm64")
   set(LIBMPV_ARCH "aarch64")
   set(
     LIBMPV_SHA256
-    "9a946f61868633f5a8f5e43acb4eec7761b850aace70865b70e0373df0c1d562"
+    "2af0781b6e90dbcdea912437136d7541cffa45b29af535475ed1ad6176b0d786"
   )
 else()
   message(
@@ -113,7 +113,7 @@ set(
   LIBMPV_REQUIRED_FILES
   "${LIBMPV_INCLUDE_DIR}/client.h"
   "${LIBMPV_INCLUDE_DIR}/render.h"
-  "${LIBMPV_INCLUDE_DIR}/render_gl.h"
+  "${LIBMPV_INCLUDE_DIR}/render_d3d11.h"
   "${LIBMPV_INCLUDE_DIR}/stream_cb.h"
   "${LIBMPV_IMPORT_LIBRARY}"
   "${LIBMPV_RUNTIME_LIBRARY}"
@@ -165,115 +165,6 @@ endforeach()
 
 # ------------------------------------------------------------------------------
 
-# ANGLE archive containing the pre-built shared libraries & headers.
-set(ANGLE_VERSION "8127")
-set(ANGLE_REVISION_SHORT "cb3a38f")
-
-if("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-x64")
-  set(ANGLE_ARCH "x64")
-  set(
-    ANGLE_SHA256
-    "06b37a8c879cfa8770488af40dc703a1bed43f7868b24f4fbcd20b8797d7673d"
-  )
-elseif("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-arm64")
-  set(ANGLE_ARCH "arm64")
-  set(
-    ANGLE_SHA256
-    "abb66a607ebf542027dd34daf3d75a0a433baf61ee747841cf57a22dd989051d"
-  )
-else()
-  message(
-    FATAL_ERROR
-    "Unsupported FLUTTER_TARGET_PLATFORM for ANGLE: "
-    "${FLUTTER_TARGET_PLATFORM}. Expected windows-x64 or windows-arm64."
-  )
-endif()
-
-set(ANGLE "ANGLE-${ANGLE_REVISION_SHORT}-windows-${ANGLE_ARCH}.7z")
-set(
-  ANGLE_URL
-  "https://github.com/Carapacik/flutter-windows-ANGLE-OpenGL-ES/releases/download/v${ANGLE_VERSION}/${ANGLE}"
-)
-
-# Download location of the ANGLE archive.
-set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
-set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
-set(ANGLE_INCLUDE_DIR "${ANGLE_SRC}/include")
-set(ANGLE_LIB_DIR "${ANGLE_SRC}/lib")
-
-download_and_verify_sha256(
-  "${ANGLE_URL}"
-  "${ANGLE_SHA256}"
-  "${ANGLE_ARCHIVE}"
-)
-
-set(
-  ANGLE_REQUIRED_FILES
-  "${ANGLE_INCLUDE_DIR}/EGL/egl.h"
-  "${ANGLE_INCLUDE_DIR}/GLES2/gl2.h"
-  "${ANGLE_INCLUDE_DIR}/GLES3/gl3.h"
-  "${ANGLE_INCLUDE_DIR}/KHR/khrplatform.h"
-  "${ANGLE_LIB_DIR}/d3dcompiler_47.dll"
-  "${ANGLE_LIB_DIR}/libEGL.dll"
-  "${ANGLE_LIB_DIR}/libGLESv2.dll"
-  "${ANGLE_LIB_DIR}/vulkan-1.dll"
-  "${ANGLE_LIB_DIR}/vk_swiftshader.dll"
-  "${ANGLE_LIB_DIR}/vk_swiftshader_icd.json"
-  "${ANGLE_LIB_DIR}/libEGL.dll.lib"
-  "${ANGLE_LIB_DIR}/libGLESv2.dll.lib"
-)
-
-# Always recreate staging from the verified archive to prevent stale files.
-message(STATUS "Extracting ${ANGLE}...")
-file(REMOVE_RECURSE "${ANGLE_SRC}")
-file(MAKE_DIRECTORY "${ANGLE_SRC}")
-
-if(SEVENZ_EXECUTABLE)
-  message(STATUS "Using 7zip for extraction: ${SEVENZ_EXECUTABLE}")
-  execute_process(
-    COMMAND "${SEVENZ_EXECUTABLE}" x -y "${ANGLE_ARCHIVE}"
-    WORKING_DIRECTORY "${ANGLE_SRC}"
-    RESULT_VARIABLE ANGLE_EXTRACT_RESULT
-    OUTPUT_VARIABLE ANGLE_EXTRACT_OUTPUT
-    ERROR_VARIABLE ANGLE_EXTRACT_ERROR
-  )
-else()
-  message(STATUS "7zip not found, falling back to CMake tar")
-  execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E tar xvf "${ANGLE_ARCHIVE}"
-    WORKING_DIRECTORY "${ANGLE_SRC}"
-    RESULT_VARIABLE ANGLE_EXTRACT_RESULT
-    OUTPUT_VARIABLE ANGLE_EXTRACT_OUTPUT
-    ERROR_VARIABLE ANGLE_EXTRACT_ERROR
-  )
-endif()
-
-if(NOT ANGLE_EXTRACT_RESULT EQUAL 0)
-  file(REMOVE_RECURSE "${ANGLE_SRC}")
-  message(
-    FATAL_ERROR
-    "Failed to extract ${ANGLE_ARCHIVE}:\n"
-    "${ANGLE_EXTRACT_OUTPUT}\n${ANGLE_EXTRACT_ERROR}"
-  )
-endif()
-
-file(
-  REMOVE
-  "${ANGLE_LIB_DIR}/zlib.dll"
-  "${ANGLE_LIB_DIR}/libc++.dll"
-)
-
-foreach(ANGLE_REQUIRED_FILE IN LISTS ANGLE_REQUIRED_FILES)
-  if(NOT EXISTS "${ANGLE_REQUIRED_FILE}")
-    file(REMOVE_RECURSE "${ANGLE_SRC}")
-    message(
-      FATAL_ERROR
-      "ANGLE archive is missing required file: ${ANGLE_REQUIRED_FILE}"
-    )
-  endif()
-endforeach()
-
-# ------------------------------------------------------------------------------
 # Flutter's generated plugin build depends on this target name.
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
 
@@ -298,11 +189,5 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 set(
   media_kit_libs_windows_video_bundled_libraries
   "${LIBMPV_RUNTIME_LIBRARY}"
-  "${ANGLE_LIB_DIR}/d3dcompiler_47.dll"
-  "${ANGLE_LIB_DIR}/libEGL.dll"
-  "${ANGLE_LIB_DIR}/libGLESv2.dll"
-  "${ANGLE_LIB_DIR}/vulkan-1.dll"
-  "${ANGLE_LIB_DIR}/vk_swiftshader.dll"
-  "${ANGLE_LIB_DIR}/vk_swiftshader_icd.json"
   PARENT_SCOPE
 )

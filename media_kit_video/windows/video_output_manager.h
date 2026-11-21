@@ -22,7 +22,8 @@
 // to the outputs. Rendering uses a shared single-worker |ThreadPool|.
 class VideoOutputManager {
  public:
-  VideoOutputManager(flutter::TextureRegistrar* registrar);
+  VideoOutputManager(flutter::TextureRegistrar* registrar,
+                     Microsoft::WRL::ComPtr<IDXGIAdapter> adapter = nullptr);
 
   // Creates a new |VideoOutput| unless |handle| already exists. The callback
   // reports (texture ID, width, height) initially and after resizing, from
@@ -45,35 +46,8 @@ class VideoOutputManager {
   ~VideoOutputManager();
 
  private:
-  // All the operations involving ANGLE or EGL or libmpv must be performed on
-  // same single thread to prevent any race conditions or invalid ANGLE usage.
-  // Not doing so results in access violations & crashes.
-  //
-  // Technically, the correct place to do all the video rendering (& thus
-  // resize) etc. is on Flutter's render thread itself (exposed as callback in
-  // |flutter::GpuSurfaceTexture| & |flutter::PixelBufferTexture|). However,
-  // this slows down the UI too much. So, a good idea seemed to have a separate
-  // worker thread which queues all the rendering related jobs & performs them
-  // orderly. |ThreadPool| is exactly that.
-  //
-  // All of the following tasks involve ANGLE or OpenGL context etc. etc.
-  // Following operations are performed through the |ThreadPool|:
-  //
-  // * Rendering of video frame i.e. |mpv_render_context_render| (also involves
-  //   |eglMakeCurrent| etc.) after being notified by
-  //   |mpv_render_context_set_update_callback|.
-  // * Creation / Disposal of new |VideoOutput|.
-  //     * For creation, |mpv_render_context_create| & instantiation of a new
-  //       |ANGLESurfaceManager| is done through |ThreadPool| (in |VideoOutput|
-  //       constructor).
-  //     * For disposal, |ThreadPool| ensures that all the pending |Render| or
-  //       |Resize| tasks are completed before freeing the |ANGLESurfaceManager|
-  //       & |mpv_render_context| etc.
-  // * Resizing of |ANGLESurfaceManager| & creation of newly sized Flutter
-  //   textures (|flutter::GpuSurfaceTexture| & |flutter::PixelBufferTexture|).
-  //
-  // Creating a |ThreadPool| with maximum number of worker threads as 1, ensures
-  // that all the posted tasks are performed on a single thread orderly.
+  // Serialize rendering, resize and context teardown across outputs.
+  Microsoft::WRL::ComPtr<IDXGIAdapter> adapter_;
   std::unique_ptr<ThreadPool> thread_pool_ = std::make_unique<ThreadPool>(1);
   flutter::TextureRegistrar* registrar_ = nullptr;
   std::atomic<bool> shutting_down_{false};

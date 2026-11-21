@@ -108,6 +108,10 @@ class VideoControllerConfiguration {
 
   /// Whether to enable hardware acceleration.
   ///
+  /// On Windows this selects the video renderer. A value of `false` uses
+  /// software rendering. The [hwdec] option controls decoding independently.
+  /// Set [hwdec] to `no` as well to decode on the CPU.
+  ///
   /// DO NOT DISABLE THIS OPTION MEANINGLESSLY.
   /// THE BATTERY WILL DRAIN, THE DEVICE MAY HEAT UP & CPU USAGE WILL BE HIGH.
   ///

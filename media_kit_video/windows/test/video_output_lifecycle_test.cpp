@@ -1,5 +1,5 @@
 // Exercise production output/manager code with injected mpv and registrar
-// failures. ANGLE and D3D resources are real; no Flutter engine is required.
+// failures. D3D11 resources are real; no Flutter engine is required.
 #include "../video_output_manager.h"
 
 #include <chrono>
@@ -24,8 +24,8 @@ struct mpv_render_context {
   std::function<void()> on_render{};
 };
 
-bool fail_gl = false, fail_sw = false, fail_render = false;
-int live_contexts = 0, gl_attempts = 0, sw_attempts = 0, wrong_surface = 0;
+bool fail_d3d = false, fail_sw = false, fail_render = false;
+int live_contexts = 0, d3d_attempts = 0, sw_attempts = 0, wrong_surface = 0;
 mpv_render_context* active_context = nullptr;
 
 extern "C" {
@@ -43,16 +43,19 @@ int mpv_render_context_create(mpv_render_context** result,
                               mpv_handle*,
                               mpv_render_param* params) {
   const bool hardware = strcmp(static_cast<const char*>(params[0].data),
-                               MPV_RENDER_API_TYPE_OPENGL) == 0;
+                               MPV_RENDER_API_TYPE_D3D11) == 0;
   if (hardware) {
-    ++gl_attempts;
-    Check(eglGetCurrentContext() != EGL_NO_CONTEXT, "GL create needs context");
+    ++d3d_attempts;
+    Check(params[1].type == MPV_RENDER_PARAM_D3D11_INIT_PARAMS &&
+              static_cast<mpv_d3d11_init_params*>(params[1].data)->device,
+          "D3D11 create needs device");
   } else {
     ++sw_attempts;
-    Check(eglGetCurrentContext() == EGL_NO_CONTEXT,
-          "fallback left EGL current");
+    Check(strcmp(static_cast<const char*>(params[0].data),
+                 MPV_RENDER_API_TYPE_SW) == 0,
+          "unexpected render API");
   }
-  if (hardware ? fail_gl : fail_sw)
+  if (hardware ? fail_d3d : fail_sw)
     return -1;
   *result = active_context = new mpv_render_context{hardware};
   ++live_contexts;
@@ -71,23 +74,17 @@ int mpv_render_context_render(mpv_render_context* ctx,
   if (ctx->on_render)
     ctx->on_render();
   if (ctx->hardware) {
-    auto* fbo = static_cast<mpv_opengl_fbo*>(params[0].data);
-    EGLint width = 0, height = 0;
-    eglQuerySurface(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW),
-                    EGL_WIDTH, &width);
-    eglQuerySurface(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW),
-                    EGL_HEIGHT, &height);
-    if (width != fbo->w || height != fbo->h)
+    Check(params[0].type == MPV_RENDER_PARAM_D3D11_FBO, "missing D3D11 target");
+    auto* fbo = static_cast<mpv_d3d11_fbo*>(params[0].data);
+    D3D11_TEXTURE2D_DESC desc{};
+    static_cast<ID3D11Texture2D*>(fbo->tex)->GetDesc(&desc);
+    if (!(desc.BindFlags & D3D11_BIND_RENDER_TARGET))
       ++wrong_surface;
-    glClearColor(0, 1, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
   }
   return 0;
 }
 void mpv_render_context_free(mpv_render_context* ctx) {
   Check(ctx->callback == nullptr, "callback must be removed before free");
-  if (ctx->hardware)
-    Check(eglGetCurrentContext() != EGL_NO_CONTEXT, "GL free needs context");
   delete ctx;
   active_context = nullptr;
   --live_contexts;
@@ -154,7 +151,7 @@ class Registrar : public flutter::TextureRegistrar {
     const auto* texture = textures_.at(id);
     if (auto* gpu = std::get_if<flutter::GpuSurfaceTexture>(texture)) {
       auto* descriptor = gpu->ObtainDescriptor(width, height);
-      Check(descriptor->handle && descriptor->width == width &&
+      Check(descriptor && descriptor->handle && descriptor->width == width &&
                 descriptor->height == height,
             "invalid retained GPU descriptor");
     } else {
@@ -176,6 +173,15 @@ class Registrar : public flutter::TextureRegistrar {
   std::vector<std::pair<int64_t, std::function<void()>>> retired_;
 };
 
+Microsoft::WRL::ComPtr<IDXGIAdapter> TestAdapter() {
+  Microsoft::WRL::ComPtr<IDXGIFactory> factory;
+  Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+  Check(SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&factory))) &&
+            SUCCEEDED(factory->EnumAdapters(0, &adapter)),
+        "test adapter");
+  return adapter;
+}
+
 void TestFailures(bool hardware) {
   ThreadPool worker(1);
   Registrar registrar;
@@ -183,14 +189,15 @@ void TestFailures(bool hardware) {
   registrar.fail_next = true;
   bool failed = false;
   try {
-    VideoOutput output(1, configuration, &registrar, &worker);
+    VideoOutput output(1, configuration, &registrar, &worker, nullptr,
+                       TestAdapter().Get());
   } catch (const std::runtime_error&) {
     failed = true;
   }
   Check(failed && live_contexts == 0 && registrar.Count() == 0,
         "initial registration failure leaked resources");
-  auto output =
-      std::make_unique<VideoOutput>(1, configuration, &registrar, &worker);
+  auto output = std::make_unique<VideoOutput>(
+      1, configuration, &registrar, &worker, nullptr, TestAdapter().Get());
   int64_t current_id = -1;
   output->SetTextureUpdateCallback(
       [&](auto id, auto, auto) { current_id = id; });
@@ -320,22 +327,24 @@ int main(int argc, char** argv) {
     {
       ThreadPool worker(1);
       Registrar registrar;
-      fail_gl = true;
+      fail_d3d = true;
       {
-        VideoOutput output(1, {64, 36, true}, &registrar, &worker);
+        VideoOutput output(1, {64, 36, true}, &registrar, &worker, nullptr,
+                           TestAdapter().Get());
       }
-      Check(gl_attempts == 1 && sw_attempts == 1 && live_contexts == 0,
+      Check(d3d_attempts == 1 && sw_attempts == 1 && live_contexts == 0,
             "hardware failure must cleanly fall back to software");
       fail_sw = true;
       bool failed = false;
       try {
-        VideoOutput output(1, {64, 36, true}, &registrar, &worker);
+        VideoOutput output(1, {64, 36, true}, &registrar, &worker, nullptr,
+                           TestAdapter().Get());
       } catch (const std::runtime_error&) {
         failed = true;
       }
       Check(failed && live_contexts == 0 && registrar.Count() == 0,
             "failure of both renderers must propagate without registration");
-      fail_gl = fail_sw = false;
+      fail_d3d = fail_sw = false;
     }
     TestFailures(false);
     TestFailures(true);

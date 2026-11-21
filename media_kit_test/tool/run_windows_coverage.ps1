@@ -4,6 +4,7 @@
 #Requires -Version 7.0
 param(
     [switch]$Software,
+    [switch]$CpuDecoding,
     [switch]$RotationOnly,
     [string]$Library = '',
     [string]$MediaDirectory = (Join-Path $PSScriptRoot '../../build/test-media'),
@@ -13,7 +14,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$mode = if ($Software) { 'sw-cpu' } else { 'hw' }
+$mode = if ($Software) { 'sw-cpu' } elseif ($CpuDecoding) { 'd3d11-cpu' } else { 'hw' }
 $media = (Resolve-Path -LiteralPath $MediaDirectory).Path
 $release = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../build/windows/x64/runner/Release')).Path
 if (!$OutputDirectory) {
@@ -47,6 +48,7 @@ try {
     )
     $arguments = @($sources | ForEach-Object { "`"$_`"" })
     if ($Software) { $arguments += '--software' }
+    if ($CpuDecoding) { $arguments += '--cpu-decoding' }
     if ($RotationOnly) { $arguments += '--rotation-only' }
     $app = Start-Process "$out/app/media_kit_test.exe" -ArgumentList $arguments `
         -WorkingDirectory $out -WindowStyle Hidden -RedirectStandardOutput "$out/stdout.log" `
@@ -66,6 +68,12 @@ try {
     $report = Get-Content "$out/coverage-$mode.json" -Raw | ConvertFrom-Json
     if ($report.status -ne 'PASS' -or $report.errors.Count -ne 0) {
         throw "Coverage failed: $($report.errors -join '; ')"
+    }
+    $log = Get-Content "$out/stdout.log" -Raw
+    $renderers = [regex]::Matches($log, 'VideoOutput: Using (D3D11|S/W) rendering')
+    $expected = if ($Software) { 'S/W' } else { 'D3D11' }
+    if ($renderers.Count -lt 6 -or ($renderers | Where-Object { $_.Groups[1].Value -ne $expected })) {
+        throw "Expected every output to use $expected. See $out/stdout.log"
     }
     Write-Output "PASS: $mode; exit code 0; report $out/coverage-$mode.json"
 } finally {

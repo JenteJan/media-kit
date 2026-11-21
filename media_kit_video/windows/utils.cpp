@@ -8,11 +8,6 @@
 
 #include "utils.h"
 
-typedef LONG NTSTATUS, *PNTSTATUS;
-#define STATUS_SUCCESS (0x00000000)
-
-typedef NTSTATUS(WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
-
 void Utils::EnterNativeFullscreen(HWND window) {
   if (fullscreen_) {
     return;
@@ -80,26 +75,6 @@ void Utils::ExitNativeFullscreen(HWND window) {
           SWP_NOACTIVATE | SWP_NOZORDER);
     }
   }
-}
-
-RTL_OSVERSIONINFOW Utils::GetWindowsVersion() {
-  HMODULE handle = ::LoadLibraryW(L"ntdll.dll");
-  RTL_OSVERSIONINFOW rtl_os_version_info = {0};
-  rtl_os_version_info.dwBuildNumber = 0;
-  rtl_os_version_info.dwOSVersionInfoSize = sizeof(rtl_os_version_info);
-  if (handle) {
-    RtlGetVersionPtr rtl_get_version_ptr = reinterpret_cast<RtlGetVersionPtr>(
-        ::GetProcAddress(handle, "RtlGetVersion"));
-    if (rtl_get_version_ptr != nullptr) {
-      rtl_get_version_ptr(&rtl_os_version_info);
-    }
-    ::FreeLibrary(handle);
-  }
-  return rtl_os_version_info;
-}
-
-bool Utils::IsWindows10RTMOrGreater() {
-  return GetWindowsVersion().dwBuildNumber >= 10240;
 }
 
 bool Utils::fullscreen_ = false;

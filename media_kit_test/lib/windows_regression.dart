@@ -1,7 +1,12 @@
-// Standalone, repeatable Windows renderer exercise. See docs/WINDOWS_TESTING.md.
+// Generate the default 90-second clips with tool/prepare_windows_six.ps1.
+// flutter run -d windows -t lib/windows_regression.dart opens all six.
+// The Release executable accepts --auto, --benchmark, --cpu-decoding, and
+// --software. Positional paths replace the demo clips; --minute validates
+// one minute of uninterrupted playback with those paths too.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,24 +17,69 @@ void main(List<String> arguments) {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final files = arguments.where((e) => !e.startsWith('--')).toList();
+  if (files.isEmpty) files.addAll(findSixClips());
   runApp(MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
     home: WindowsRegression(
       files: files,
       software: arguments.contains('--software'),
-      automatic: arguments.contains('--auto'),
+      automatic:
+          arguments.contains('--auto') || arguments.contains('--benchmark'),
+      benchmark: arguments.contains('--benchmark'),
+      cpuDecoding: arguments.contains('--cpu-decoding'),
+      checkMinute: arguments.contains('--minute') ||
+          arguments.every((a) => a.startsWith('--')),
     ),
   ));
+}
+
+// The Release executable is usually nested inside the checkout; a packaged
+// demo may place the same six-videos folder alongside its executable.
+List<String> findSixClips() {
+  const names = [
+    '01-landscape-h264.mp4',
+    '02-padded-hevc.mp4',
+    '03-portrait-h264.mp4',
+    '04-main10-hevc.mp4',
+    '05-wide-h264.mp4',
+    '06-landscape-hevc.mp4',
+  ];
+  final executableDirectory = File(Platform.resolvedExecutable).parent;
+  final candidates = [
+    Directory.fromUri(executableDirectory.uri.resolve('six-videos/'))
+  ];
+  for (final start in [Directory.current, executableDirectory]) {
+    var directory = start;
+    while (directory.parent.path != directory.path) {
+      candidates.add(
+          Directory.fromUri(directory.uri.resolve('build/test-media/six/')));
+      directory = directory.parent;
+    }
+  }
+  for (final directory in candidates) {
+    final clips =
+        names.map((name) => File.fromUri(directory.uri.resolve(name)));
+    if (clips.every((clip) => clip.existsSync())) {
+      return clips.map((clip) => clip.path).toList();
+    }
+  }
+  return [];
 }
 
 class WindowsRegression extends StatefulWidget {
   final List<String> files;
   final bool software;
+  final bool cpuDecoding;
   final bool automatic;
+  final bool benchmark;
+  final bool checkMinute;
   const WindowsRegression(
       {super.key,
       required this.files,
+      required this.cpuDecoding,
       required this.software,
+      required this.benchmark,
+      required this.checkMinute,
       required this.automatic});
 
   @override
@@ -68,7 +118,7 @@ class _WindowsRegressionState extends State<WindowsRegression> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.automatic) {
-        unawaited(runScenario());
+        unawaited(widget.benchmark ? runBenchmark() : runScenario());
       } else if (widget.files.isNotEmpty) {
         unawaited(perform('Open six', openSix));
       }
@@ -110,6 +160,7 @@ class _WindowsRegressionState extends State<WindowsRegression> {
       final player = Player();
       final controller = VideoController(player,
           configuration: VideoControllerConfiguration(
+            hwdec: widget.software || widget.cpuDecoding ? 'no' : null,
             enableHardwareAcceleration: !widget.software,
           ));
       final slot = _Slot(player, controller);
@@ -135,6 +186,13 @@ class _WindowsRegressionState extends State<WindowsRegression> {
       final native = slot.player.platform as NativePlayer;
       final codec = await native.getProperty('current-tracks/video/codec');
       final hwdec = await native.getProperty('hwdec-current');
+      if (widget.automatic) {
+        final expected =
+            widget.software || widget.cpuDecoding ? 'no' : 'd3d11va';
+        if (hwdec != expected) {
+          throw StateError('Expected $expected, got $hwdec');
+        }
+      }
       final source = widget.files[i % widget.files.length];
       slot.details =
           '${source.startsWith('http') ? 'HTTP' : 'local'} · $codec · $hwdec';
@@ -243,8 +301,100 @@ class _WindowsRegressionState extends State<WindowsRegression> {
     await checkProgress();
   }
 
+  Future<List<int>> dropCounts(String property) async {
+    return Future.wait(slots.whereType<_Slot>().map((slot) async {
+      final player = slot.player.platform as NativePlayer;
+      return int.parse(await player.getProperty(property));
+    }));
+  }
+
+  Future<void> runBenchmark() => perform('Benchmark six streams', () async {
+        await openSix();
+        await checkProgress(duration: const Duration(seconds: 5));
+        final rasterUs = <int>[];
+        void timings(List<FrameTiming> batch) {
+          rasterUs.addAll(batch.map((t) => t.rasterDuration.inMicroseconds));
+        }
+
+        for (final slot in slots.whereType<_Slot>()) {
+          if (slot.player.state.duration - slot.player.state.position <
+              const Duration(seconds: 22)) {
+            throw StateError('Use the 90-second clips for the benchmark');
+          }
+        }
+        final before = await dropCounts('frame-drop-count');
+        final decoderBefore = await dropCounts('decoder-frame-drop-count');
+        final start = await window.invokeMapMethod<String, dynamic>('metrics');
+        final timer = Stopwatch()..start();
+        WidgetsBinding.instance.addTimingsCallback(timings);
+        try {
+          await checkProgress(duration: const Duration(seconds: 20));
+        } finally {
+          WidgetsBinding.instance.removeTimingsCallback(timings);
+        }
+        final end = await window.invokeMapMethod<String, dynamic>('metrics');
+        final after = await dropCounts('frame-drop-count');
+        final decoderAfter = await dropCounts('decoder-frame-drop-count');
+        rasterUs.sort();
+        if (rasterUs.isEmpty) throw StateError('No Flutter frame timings');
+        int percentile(double fraction) =>
+            rasterUs[(fraction * rasterUs.length).ceil() - 1];
+        record('Benchmark', {
+          'wallUs': timer.elapsedMicroseconds,
+          'processCpuUs': (end!['cpuUs'] as int) - (start!['cpuUs'] as int),
+          'flutterFrames': rasterUs.length,
+          'rasterP95Us': percentile(0.95),
+          'rasterP99Us': percentile(0.99),
+          'voDrops': [
+            for (var i = 0; i < after.length; i++) after[i] - before[i]
+          ],
+          'decoderDrops': [
+            for (var i = 0; i < after.length; i++)
+              decoderAfter[i] - decoderBefore[i]
+          ],
+          'rssBytes': ProcessInfo.currentRss,
+          'privateBytes': end['privateBytes'],
+          'gpuLocalBytes': end['gpuLocalBytes'],
+          'handles': end['handles'],
+        });
+        record('PASS');
+      });
+
+  Future<void> playOneMinute() async {
+    final active = slots.whereType<_Slot>().toList();
+    const minute = Duration(minutes: 1);
+    for (final slot in active) {
+      if (slot.player.state.duration - slot.player.state.position < minute) {
+        throw StateError(
+            'The minute check needs at least 60 seconds left in each clip');
+      }
+    }
+    final starts = [for (final slot in active) slot.player.state.position];
+    final deadline = DateTime.now().add(const Duration(seconds: 75));
+    final previous = List<Duration>.of(starts);
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      var completed = 0;
+      for (var i = 0; i < active.length; i++) {
+        final position = active[i].player.state.position;
+        if (position < previous[i]) {
+          throw StateError('Clip ${i + 1} restarted before one minute');
+        }
+        if (position - starts[i] >= minute) completed++;
+        previous[i] = position;
+      }
+      if (completed == active.length) {
+        record('One uninterrupted minute on all six players',
+            [for (final p in previous) p.inMilliseconds]);
+        return;
+      }
+    }
+    throw TimeoutException('Six players did not advance by a full minute');
+  }
+
   Future<void> runScenario() => perform('Automated scenario', () async {
         await openSix();
+        if (widget.checkMinute) await playOneMinute();
         await checkProgress();
         await resizeSequence();
         final first = slots.first!;
@@ -284,7 +434,7 @@ class _WindowsRegressionState extends State<WindowsRegression> {
     final report =
         File('windows-regression-${widget.software ? 'sw' : 'hw'}.json');
     await report.writeAsString(const JsonEncoder.withIndent('  ').convert({
-      'requestedRenderer': widget.software ? 'software' : 'ANGLE',
+      'requestedRenderer': widget.software ? 'software' : 'D3D11',
       'files': widget.files,
       'status': status,
       'errors': errors,
@@ -311,7 +461,7 @@ class _WindowsRegressionState extends State<WindowsRegression> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
             title: Text(
-                'Windows · six videos · ${widget.software ? 'S/W' : 'ANGLE'}')),
+                'Windows · six videos · ${widget.software ? 'S/W' : 'D3D11'}')),
         body: Column(children: [
           Wrap(spacing: 8, children: [
             FilledButton(
@@ -335,7 +485,8 @@ class _WindowsRegressionState extends State<WindowsRegression> {
               padding: const EdgeInsets.all(8),
               child: Text('$status · errors: ${errors.length}')),
           if (widget.files.isEmpty)
-            const Text('Launch with local video file paths as arguments.'),
+            const Text(
+                'Run tool/prepare_windows_six.ps1 or pass local video paths.'),
           Expanded(child: LayoutBuilder(builder: (context, constraints) {
             final columns = constraints.maxWidth >= 900 ? 3 : 2;
             final rows = (6 / columns).ceil();

@@ -19,13 +19,12 @@ set(PLUGIN_NAME "media_kit_video_plugin")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 set(LIBMPV_INCLUDE_DIR "${LIBMPV_SRC}/include/mpv")
 set(LIBMPV_IMPORT_LIBRARY "${LIBMPV_SRC}/libmpv.dll.a")
-set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
 
 set(PLUGIN_SOURCES)
 if(MEDIA_KIT_LIBS_AVAILABLE)
   list(APPEND PLUGIN_SOURCES
-    "angle_surface_manager.cpp"
-    "angle_surface_manager.h"
+    "d3d11_surface_manager.cpp"
+    "d3d11_surface_manager.h"
     "media_kit_video_plugin.cpp"
     "platform_task_runner.cpp"
     "platform_task_runner.h"
@@ -64,12 +63,10 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 if(MEDIA_KIT_LIBS_AVAILABLE)
   target_include_directories(${PLUGIN_NAME} PRIVATE
     "${LIBMPV_INCLUDE_DIR}"
-    "${ANGLE_SRC}/include"
   )
   target_link_libraries(${PLUGIN_NAME} PRIVATE
     "${LIBMPV_IMPORT_LIBRARY}"
-    "${ANGLE_SRC}/lib/libEGL.dll.lib"
-    "${ANGLE_SRC}/lib/libGLESv2.dll.lib"
+    d3d11 dxgi
   )
 else()
   message(NOTICE "media_kit: WARNING: package:media_kit_libs_*** not found.")

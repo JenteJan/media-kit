@@ -12,6 +12,29 @@
 
 namespace media_kit_video {
 
+namespace {
+using Microsoft::WRL::ComPtr;
+
+// New SDKs expose the engine adapter even before the first view exists.
+template <class Registrar>
+auto GraphicsAdapter(Registrar* registrar, int)
+    -> decltype(registrar->GetGraphicsAdapter(
+                    static_cast<IDXGIAdapter**>(nullptr)),
+                ComPtr<IDXGIAdapter>{}) {
+  ComPtr<IDXGIAdapter> adapter;
+  registrar->GetGraphicsAdapter(adapter.GetAddressOf());
+  return adapter;
+}
+
+template <class Registrar>
+ComPtr<IDXGIAdapter> GraphicsAdapter(Registrar* registrar, long) {
+  ComPtr<IDXGIAdapter> adapter;
+  if (auto* view = registrar->GetView())
+    adapter.Attach(view->GetGraphicsAdapter());
+  return adapter;
+}
+}  // namespace
+
 void MediaKitVideoPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows* registrar) {
   auto plugin = std::make_unique<MediaKitVideoPlugin>(registrar);
@@ -21,8 +44,9 @@ void MediaKitVideoPlugin::RegisterWithRegistrar(
 MediaKitVideoPlugin::MediaKitVideoPlugin(
     flutter::PluginRegistrarWindows* registrar)
     : registrar_(registrar),
-      video_output_manager_(std::make_unique<VideoOutputManager>(
-          registrar->texture_registrar())) {
+      video_output_manager_(
+          std::make_unique<VideoOutputManager>(registrar->texture_registrar(),
+                                               GraphicsAdapter(registrar, 0))) {
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       registrar->messenger(), "com.alexmercerind/media_kit_video",
       &flutter::StandardMethodCodec::GetInstance());

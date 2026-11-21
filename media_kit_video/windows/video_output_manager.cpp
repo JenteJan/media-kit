@@ -8,8 +8,10 @@
 
 #include "video_output_manager.h"
 
-VideoOutputManager::VideoOutputManager(flutter::TextureRegistrar* registrar)
-    : registrar_(registrar) {}
+VideoOutputManager::VideoOutputManager(
+    flutter::TextureRegistrar* registrar,
+    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter)
+    : adapter_(std::move(adapter)), registrar_(registrar) {}
 
 void VideoOutputManager::Create(
     int64_t handle,
@@ -19,9 +21,9 @@ void VideoOutputManager::Create(
   operations_->Post([=]() {
     try {
       if (video_outputs_.find(handle) == video_outputs_.end()) {
-        auto instance =
-            std::make_unique<VideoOutput>(handle, configuration, registrar_,
-                                          thread_pool_.get(), &shutting_down_);
+        auto instance = std::make_unique<VideoOutput>(
+            handle, configuration, registrar_, thread_pool_.get(),
+            &shutting_down_, adapter_.Get());
         instance->SetTextureUpdateCallback(texture_update_callback);
         video_outputs_.insert(std::make_pair(handle, std::move(instance)));
       }
