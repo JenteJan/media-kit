@@ -1,5 +1,7 @@
-## Unreleased
+## 2.0.2
 
+- Migrate the Android plugin to Kotlin and Gradle Kotlin DSL with JVM 17 and a minimum Android API level of 24.
+- Require iOS 15 or macOS 12 on Apple platforms and link `FlutterFramework` in the Swift packages.
 - Drop Windows Direct3D feature levels below 10_0.
 
 ## 2.0.1

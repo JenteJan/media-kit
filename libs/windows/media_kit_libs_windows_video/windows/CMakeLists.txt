@@ -35,9 +35,6 @@ function(download_and_verify_sha256 url sha256 locationForArchive)
       "${locationForArchive}"
       EXPECTED_HASH "SHA256=${sha256}"
       STATUS DOWNLOAD_STATUS
-      TLS_VERIFY ON
-      TIMEOUT 300
-      INACTIVITY_TIMEOUT 30
     )
     list(GET DOWNLOAD_STATUS 0 DOWNLOAD_STATUS_CODE)
     list(GET DOWNLOAD_STATUS 1 DOWNLOAD_STATUS_MESSAGE)

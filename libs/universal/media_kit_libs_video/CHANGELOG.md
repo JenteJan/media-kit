@@ -1,3 +1,7 @@
+## Unreleased
+
+- Update the native packages for Android (API 24+), iOS (15+), and macOS (12+).
+
 ## 1.0.8
 
 - build: bump dependencies
