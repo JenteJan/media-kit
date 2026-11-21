@@ -14,8 +14,8 @@
 #include <stdexcept>
 
 namespace {
-// libmpv's SW renderer scales the unrotated picture. Its GPU renderer
-// handles orientation itself.
+// The software renderer scales the frame before rotation.
+// The GPU renderer applies rotation itself.
 void RotateSoftwareFrame(const uint8_t* source, uint8_t* destination,
                          int width, int height, int clockwise) {
   const int output_width = clockwise == 180 ? width : height;
@@ -51,8 +51,7 @@ VideoOutput::VideoOutput(int64_t handle,
       registrar_(registrar),
       thread_pool_ref_(thread_pool_ref),
       shutting_down_(shutting_down) {
-  // D3D11 and libmpv render operations share one rendering worker across
-  // outputs.
+  // All outputs share one worker for D3D11 and libmpv rendering.
   auto future = thread_pool_ref_->Post([this, configuration, adapter]() {
     try {
       mpv_set_option_string(handle_, "video-sync", "audio");
@@ -109,8 +108,7 @@ VideoOutput::VideoOutput(int64_t handle,
       throw;
     }
   });
-  // Propagate initialization errors instead of returning a partially built
-  // output.
+  // Wait for initialization. Report any error to the caller.
   future.get();
 }
 
@@ -119,8 +117,9 @@ VideoOutput::~VideoOutput() {
     std::lock_guard<std::mutex> lock(notification_mutex_);
     destroyed_ = true;
   }
-  // All previously accepted tasks precede this barrier. No callback can enqueue
-  // a new task after it; unregister callbacks never reference this object.
+  // The worker finishes all accepted tasks before cleanup.
+  // The shutdown flag blocks new render requests.
+  // Unregister callbacks retain their own resources.
   thread_pool_ref_->Post([this]() { CleanUp(); }).get();
   for (auto& retirement : retirements_) {
     while (retirement.wait_for(std::chrono::milliseconds(10)) !=
@@ -157,8 +156,8 @@ void VideoOutput::RetireTexture() {
   const auto id = retired->id;
   registrar_->UnregisterTexture(
       id, [retired = std::move(retired), completion]() mutable {
-        // The callback, descriptors and COM references remain alive until the
-        // engine has stopped requesting this particular registration.
+        // Keep the callback, descriptors, and COM references alive until
+        // the engine releases this registration.
         retired.reset();
         completion->set_value();
       });
@@ -292,7 +291,7 @@ void VideoOutput::Resize(
       throw std::runtime_error("Flutter texture registration failed");
   };
   if (surface_manager_) {
-    // Validate allocation before replacing the currently registered size.
+    // Allocate the new surface before replacing the current registration.
     frame->first_target = first_target
                               ? std::move(first_target)
                               : surface_manager_->CreateSurface(
@@ -334,16 +333,15 @@ void VideoOutput::Resize(
         }));
     register_texture();
   }
-  // The callback is self-contained before registration can expose it to
-  // Flutter.
+  // The new callback owns its resources before Flutter can call it.
   RetireTexture();
   texture_ = std::move(next);
   texture_update_callback_(texture_->id, required_width, required_height);
 }
 std::optional<media_kit::VideoFrameSize> VideoOutput::GetVideoSize() {
   int64_t dw = 0, dh = 0, rotate = 0;
-  // One snapshot for both sides. A missing property is normal before open or
-  // for audio-only media; never inspect an uninitialized mpv_node.
+  // Read both dimensions from the same mpv property.
+  // mpv can omit this property before playback or for audio-only media.
   mpv_node params{};
   if (mpv_get_property(handle_, "video-out-params", MPV_FORMAT_NODE, &params) >=
       0) {

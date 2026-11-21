@@ -22,10 +22,10 @@ struct VideoFrameSize {
   int32_t height;
 };
 
-// Overrides apply independently, as in the native configuration contract:
-// a missing side uses that side of the rotated video, not an inferred ratio.
-// The software limit then scales the resulting pair uniformly, rounding down
-// (with a one-pixel minimum). Small frames are never enlarged.
+// Apply the width and height overrides independently.
+// For each missing dimension, use the rotated video dimension.
+// Scale oversized software frames uniformly. Round down to whole pixels.
+// Keep each dimension at one pixel or more. Keep smaller frames at their original size.
 inline std::optional<VideoFrameSize> ResolveVideoFrameSize(
     int64_t display_width,
     int64_t display_height,
@@ -44,8 +44,8 @@ inline std::optional<VideoFrameSize> ResolveVideoFrameSize(
     return std::nullopt;
   }
   if (software && (w > kSoftwareMaxWidth || h > kSoftwareMaxHeight)) {
-    // Products fit in int64_t after the range check above. Integer arithmetic
-    // avoids floating-point rounding past the buffer's width/height limits.
+    // The range check keeps both products within int64_t.
+    // Integer division keeps the result within the buffer limits.
     if (w * kSoftwareMaxHeight >= h * kSoftwareMaxWidth) {
       h = (std::max)(int64_t{1}, h * kSoftwareMaxWidth / w);
       w = kSoftwareMaxWidth;
@@ -78,7 +78,7 @@ inline std::optional<SoftwareFrameLayout> GetSoftwareFrameLayout(
   const size_t bytes = stride * height;
   if (bytes > capacity)
     return std::nullopt;
-  // FlutterDesktopPixelBuffer has no stride field: rows must be tightly packed.
+  // Pack the rows together. FlutterDesktopPixelBuffer has no stride field.
   return SoftwareFrameLayout{stride, bytes};
 }
 

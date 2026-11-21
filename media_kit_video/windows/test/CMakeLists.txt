@@ -18,7 +18,7 @@ else()
   target_compile_options(video_frame_size_test PRIVATE -Wall -Wextra -Werror)
 endif()
 
-# Inject libmpv failures while compiling the actual output and manager code.
+# Test the output and its manager with simulated libmpv failures.
 set(MEDIA_KIT_FLUTTER_DIR "" CACHE PATH "Flutter Windows ephemeral directory")
 set(MEDIA_KIT_LIBMPV_DIR "" CACHE PATH "libmpv directory from the Flutter Windows build")
 if(WIN32 AND MEDIA_KIT_FLUTTER_DIR AND MEDIA_KIT_LIBMPV_DIR)

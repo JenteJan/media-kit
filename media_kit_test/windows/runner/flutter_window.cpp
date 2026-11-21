@@ -21,18 +21,17 @@ bool FlutterWindow::OnCreate() {
 
   RECT frame = GetClientArea();
 
-  // The size here must match the window dimensions to avoid unnecessary surface
-  // creation / destruction in the startup path.
+  // Match the initial surface size to the window size to avoid reallocating it.
   flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
       frame.right - frame.left, frame.bottom - frame.top, project_);
-  // Ensure that basic setup of the controller was successful.
+  // Check that the controller has an engine and a view.
   if (!flutter_controller_->engine() || !flutter_controller_->view()) {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // Test-application-only controls for repeatable real-window resize checks.
+  // Expose window controls for repeatable resize tests.
   test_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "media_kit_test/window",
@@ -137,9 +136,8 @@ bool FlutterWindow::OnCreate() {
            flutter::EncodableValue(IsIconic(GetHandle()) != FALSE)},
       }));
     } else if (call.method_name() == "capture") {
-      // Capture the composed client area, including the actual Flutter texture.
-      // Player.screenshot() alone does not validate texture presentation or
-      // fit.
+      // Capture the client area to check how Flutter displays and fits the texture.
+      // Player.screenshot() captures the player output before Flutter displays it.
       const auto client = GetClientArea();
       const int width = client.right, height = client.bottom;
       if (width <= 0 || height <= 0 || width > 8192 || height > 8192) {
@@ -192,9 +190,8 @@ bool FlutterWindow::OnCreate() {
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() { this->Show(); });
 
-  // Flutter can complete the first frame before the "show window" callback is
-  // registered. The following call ensures a frame is pending to ensure the
-  // window is shown. It is a no-op if the first frame hasn't completed yet.
+  // Flutter can finish the first frame before we register the show callback.
+  // Request a redraw so the callback can show the window.
   flutter_controller_->ForceRedraw();
 
   return true;
@@ -214,7 +211,7 @@ FlutterWindow::MessageHandler(HWND hwnd,
                               UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // Give Flutter, including plugins, an opportunity to handle window messages.
+  // Let Flutter and its plugins handle the message first.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
         flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,

@@ -1,6 +1,5 @@
-# Requires a Release build of lib/windows_coverage.dart and prepared fixtures.
-# Checks both the Dart report and the process exit code: a crashed process must
-# never pass merely because its window disappeared.
+# Build lib/windows_coverage.dart in Release mode. Prepare the test clips.
+# The runner checks the Dart report. It also checks the process exit code.
 #Requires -Version 7.0
 param(
     [switch]$Software,
@@ -77,7 +76,7 @@ try {
     }
     Write-Output "PASS: $mode; exit code 0; report $out/coverage-$mode.json"
 } finally {
-    # Stop only child processes started by this invocation, never other apps.
+    # Stop the child processes that this run started.
     if ($app -and !$app.HasExited) { $app.Kill(); $app.WaitForExit() }
     if ($server -and !$server.HasExited) { $server.Kill(); $server.WaitForExit() }
 }

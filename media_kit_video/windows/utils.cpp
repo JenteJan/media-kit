@@ -14,12 +14,9 @@ void Utils::EnterNativeFullscreen(HWND window) {
   }
   fullscreen_ = true;
 
-  // The primary idea here is to revolve around |WS_OVERLAPPEDWINDOW| &
-  // detect/set fullscreen based on it. In the window procedure, this is
-  // separately handled. If there is no |WS_OVERLAPPEDWINDOW| style on the
-  // window i.e. in fullscreen, then no area is left for |WM_NCHITTEST|,
-  // accordingly client area is also expanded to fill whole monitor using
-  // |WM_NCCALCSIZE|.
+  // Remove WS_OVERLAPPEDWINDOW to enter full screen.
+  // The window procedure handles WM_NCCALCSIZE to extend the client area
+  // across the monitor.
 
   auto style = ::GetWindowLongPtr(window, GWL_STYLE);
   if (style & WS_OVERLAPPEDWINDOW) {

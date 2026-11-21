@@ -4,7 +4,7 @@
 # All rights reserved.
 # Use of this source code is governed by MIT license that can be found in the LICENSE file.
 
-# Keep the minimum version compatible with Flutter plugin clients.
+# Support Flutter projects that use CMake 3.14.
 cmake_minimum_required(VERSION 3.14)
 
 set(PROJECT_NAME "media_kit_video")
@@ -12,10 +12,10 @@ project(${PROJECT_NAME} LANGUAGES CXX)
 
 cmake_policy(VERSION 3.14...3.25)
 
-# Flutter's generated plugin build depends on this target name.
+# Flutter uses this target name in its plugin build.
 set(PLUGIN_NAME "media_kit_video_plugin")
 
-# These libraries are supplied by package:media_kit_libs_***.
+# The Windows video libraries package supplies the libmpv SDK.
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 set(LIBMPV_INCLUDE_DIR "${LIBMPV_SRC}/include/mpv")
 set(LIBMPV_IMPORT_LIBRARY "${LIBMPV_SRC}/libmpv.dll.a")
@@ -75,7 +75,7 @@ endif()
 
 set(media_kit_video_bundled_libraries "" PARENT_SCOPE)
 
-# Like the Flutter plugin template, clients only build tests when opted in.
+# Set include_media_kit_video_tests to build the native tests.
 if(include_media_kit_video_tests)
   enable_testing()
   add_subdirectory(test)

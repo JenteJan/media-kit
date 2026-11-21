@@ -16,44 +16,44 @@
 #include "thread_pool.h"
 #include "video_output.h"
 
-// Creates & disposes |VideoOutput| instances for video embedding.
+// Manage video outputs for embedded playback.
 //
-// Create, SetSize and Dispose dispatch asynchronously and synchronize access
-// to the outputs. Rendering uses a shared single-worker |ThreadPool|.
+// Create, SetSize, and Dispose run on the control worker.
+// All outputs share one rendering worker.
 class VideoOutputManager {
  public:
   VideoOutputManager(flutter::TextureRegistrar* registrar,
                      Microsoft::WRL::ComPtr<IDXGIAdapter> adapter = nullptr);
 
-  // Creates a new |VideoOutput| unless |handle| already exists. The callback
-  // reports (texture ID, width, height) initially and after resizing, from
-  // background threads; platform-channel work must be dispatched separately.
+  // Create one output per handle. The callback reports the texture ID and size.
+  // It runs on a background thread at registration and after a resize.
+  // Send platform messages from the Flutter platform thread.
   void Create(
       int64_t handle,
       VideoOutputConfiguration configuration,
       std::function<void(int64_t, int64_t, int64_t)> texture_update_callback,
       std::function<void(std::string)> completion);
 
-  // Queues size overrides for an existing output; nullopt follows the video.
-  // The rendering worker also processes the request while paused.
+  // Pass nullopt to use the video dimension for that axis.
+  // The rendering worker applies the size change even during pause.
   void SetSize(int64_t handle,
                std::optional<int64_t> width,
                std::optional<int64_t> height);
 
-  // Destroys the |VideoOutput| with given handle.
+  // Destroy the output for this handle.
   void Dispose(int64_t handle, std::function<void()> completion);
 
   ~VideoOutputManager();
 
  private:
-  // Serialize rendering, resize and context teardown across outputs.
+  // All outputs use the same adapter and rendering worker.
   Microsoft::WRL::ComPtr<IDXGIAdapter> adapter_;
   std::unique_ptr<ThreadPool> thread_pool_ = std::make_unique<ThreadPool>(1);
   flutter::TextureRegistrar* registrar_ = nullptr;
   std::atomic<bool> shutting_down_{false};
   std::unordered_map<int64_t, std::unique_ptr<VideoOutput>> video_outputs_ = {};
-  // Separate from rendering: output destruction may wait for rendering and
-  // raster-thread unregister callbacks. FIFO preserves platform-call order.
+  // The control worker processes platform calls in order.
+  // It can wait for rendering and texture release during destruction.
   std::unique_ptr<ThreadPool> operations_ = std::make_unique<ThreadPool>(1);
 };
 

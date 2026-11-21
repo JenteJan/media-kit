@@ -15,8 +15,9 @@
 
 namespace media_kit_video {
 
-// Created and destroyed on the platform thread. Producers must be joined before
-// destruction. The message-only window belongs to the plugin, not any view.
+// Create and destroy the runner on the platform thread.
+// Join all producers before destruction.
+// The plugin owns the message-only window across views.
 class PlatformTaskRunner {
  public:
   PlatformTaskRunner();
@@ -25,7 +26,8 @@ class PlatformTaskRunner {
   PlatformTaskRunner& operator=(const PlatformTaskRunner&) = delete;
 
   bool Post(std::function<void()> task);
-  // Rejects new tasks and discards queued callbacks. Platform thread only.
+  // Call Close on the platform thread. It rejects new tasks.
+  // It also discards queued callbacks.
   void Close();
 
  private:

@@ -6,14 +6,14 @@
 
 cmake_minimum_required(VERSION 3.14)
 
-# This option is read by the other packages which are part of package:media_kit.
+# Other media_kit plugins read this option to find the native libraries.
 option(MEDIA_KIT_LIBS_AVAILABLE "package:media_kit libraries are available." ON)
 
 set(PROJECT_NAME "media_kit_libs_windows_video")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
-# Opt in to policies supported by Flutter's minimum CMake version without
-# requiring policies introduced by newer CMake releases.
+# Use policies through CMake 3.25 when available.
+# Keep compatibility with CMake 3.14.
 cmake_policy(VERSION 3.14...3.25)
 
 # ------------------------------------------------------------------------------
@@ -60,10 +60,10 @@ function(download_and_verify_sha256 url sha256 locationForArchive)
   message(STATUS "${locationForArchive} SHA-256 verification successful.")
 endfunction()
 
-# Find 7zip for extracting the libmpv archive.
+# Use 7-Zip if available. Otherwise, use CMake to extract the archive.
 find_program(SEVENZ_EXECUTABLE NAMES 7z 7za)
 
-# libmpv 0.42.0 release artifacts.
+# Select the libmpv SDK for the target architecture.
 set(LIBMPV_RELEASE "20261123")
 set(LIBMPV_BUILD_DATE "20261123")
 set(LIBMPV_REVISION_SHORT "b0841e8c4d")
@@ -119,7 +119,7 @@ set(
   "${LIBMPV_RUNTIME_LIBRARY}"
 )
 
-# Always recreate staging from the verified archive to prevent stale files.
+# Extract the verified SDK into an empty directory.
 message(STATUS "Extracting ${LIBMPV}...")
 file(REMOVE_RECURSE "${LIBMPV_SRC}")
 file(MAKE_DIRECTORY "${LIBMPV_SRC}")
@@ -165,7 +165,7 @@ endforeach()
 
 # ------------------------------------------------------------------------------
 
-# Flutter's generated plugin build depends on this target name.
+# Flutter uses this target name in its plugin build.
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
 
 add_library(${PLUGIN_NAME} SHARED

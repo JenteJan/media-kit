@@ -1,4 +1,4 @@
-// Regression probe for Player.screenshot with D3D11 and software rendering.
+// Test Player.screenshot with D3D11 and software rendering.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

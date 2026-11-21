@@ -472,7 +472,7 @@ class _CoverageScreenState extends State<CoverageScreen> {
     final capture = (await window.invokeMapMethod<String, dynamic>('capture'))!;
     final width = capture['width'] as int, height = capture['height'] as int;
     final bytes = Uint8List.fromList(capture['bgra'] as Uint8List);
-    // GDI captures have no meaningful alpha; keep their RGB values unchanged.
+    // Keep the RGB values from the GDI capture. Ignore its alpha channel.
     for (var i = 3; i < bytes.length; i += 4) {
       bytes[i] = 255;
     }

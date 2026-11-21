@@ -1,6 +1,8 @@
 ## 2.0.0
 
-- Ship libmpv with the D3D11 render API. This package requires a Windows video plugin using native D3D11 or software rendering. The separate ANGLE distribution has been removed.
+- Ship libmpv with the D3D11 render API.
+- Use a Windows video plugin that supports D3D11 or software rendering.
+- Remove the separate ANGLE libraries from the package.
 
 ## Unreleased
 

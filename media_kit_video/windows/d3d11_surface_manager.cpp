@@ -61,8 +61,8 @@ D3D11SurfaceManager::CreateSurface(int width, int height) const {
 }
 
 void D3D11SurfaceManager::WaitForWrites() {
-  // Each published surface is immutable. Wait on the producer thread before
-  // allowing Flutter's device to sample it; no wait runs on the raster thread.
+  // Wait for GPU writes on the producer thread before Flutter reads the surface.
+  // The producer leaves the surface unchanged after publication.
   if (!completed_.IsValid()) {
     completed_.Attach(CreateEventW(nullptr, FALSE, FALSE, nullptr));
     if (!completed_.IsValid())
@@ -70,7 +70,7 @@ void D3D11SurfaceManager::WaitForWrites() {
   }
   Check(dxgi_->EnqueueSetEvent(completed_.Get()), "EnqueueSetEvent");
   if (WaitForSingleObject(completed_.Get(), 2000) != WAIT_OBJECT_0) {
-    // A late signal from this submission must never release a subsequent frame.
+    // Discard this event so a late signal cannot release the next frame.
     completed_.Close();
     throw std::runtime_error("D3D11 frame completion wait failed");
   }

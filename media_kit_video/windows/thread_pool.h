@@ -75,7 +75,7 @@ decltype(auto) ThreadPool::Post(F&& f, Args&&... args) {
 inline ThreadPool::~ThreadPool() {
   {
     std::unique_lock<std::mutex> lock(queue_mutex_);
-    // Reject new work before draining; accepted tasks still run before exit.
+    // Reject new tasks. Finish all accepted tasks before exit.
     stop_ = true;
   }
   condition_.notify_all();

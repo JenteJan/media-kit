@@ -1,4 +1,4 @@
-# Generate the six long clips used by windows_regression.dart and the window group.
+# Generate six clips for the playback and window group tests.
 param([string]$OutputDirectory = (Join-Path $PSScriptRoot '../../build/test-media/six'))
 $ErrorActionPreference = 'Stop'
 $root = (New-Item -ItemType Directory -Path $OutputDirectory -Force).FullName

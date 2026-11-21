@@ -31,8 +31,8 @@
 typedef struct _VideoOutputConfiguration {
   std::optional<int64_t> width;
   std::optional<int64_t> height;
-  // Prefers D3D11 rendering, with software rendering as fallback.
-  // Hardware video decoding is configured separately through mpv.
+  // Try D3D11 first when this flag is true. Fall back to software if setup fails.
+  // The mpv hwdec option controls video decoding.
   bool enable_hardware_acceleration;
 
   _VideoOutputConfiguration(std::optional<int64_t> width = std::nullopt,
@@ -45,8 +45,9 @@ typedef struct _VideoOutputConfiguration {
 
 class VideoOutput {
  public:
-  // Initialization and destruction wait for work queued on |thread_pool_ref|;
-  // neither may run on that worker. The pool must outlive this output.
+  // Create and destroy this output outside the rendering worker.
+  // Both operations wait for tasks on that worker.
+  // Keep the pool alive until destruction ends.
   VideoOutput(int64_t handle,
               VideoOutputConfiguration configuration,
               flutter::TextureRegistrar* registrar,
@@ -56,21 +57,21 @@ class VideoOutput {
 
   ~VideoOutput();
 
-  // Reports (texture ID, width, height) on the rendering worker. Marshal any
-  // platform-channel work to Flutter's platform thread.
+  // The rendering worker reports the texture ID, width, and height.
+  // Send platform messages from the Flutter platform thread.
   void SetTextureUpdateCallback(
       std::function<void(int64_t, int64_t, int64_t)> callback);
 
-  // Queues size overrides; nullopt uses the video's corresponding dimension.
-  // Resizes and redraws on the rendering worker, including while paused.
+  // Pass nullopt to use the video dimension for that axis.
+  // The rendering worker resizes and redraws the frame even during pause.
   void SetSize(std::optional<int64_t> width, std::optional<int64_t> height);
 
  private:
   struct Frame {
     media_kit::VideoFrameSize size;
     std::shared_ptr<D3D11SurfaceManager::Surface> first_target;
-    // latest is published atomically by the worker. imported and the
-    // descriptor are accessed exclusively on Flutter's raster thread.
+    // The rendering worker publishes latest atomically.
+    // Only the Flutter raster thread uses imported and the GPU descriptor.
     std::shared_ptr<D3D11SurfaceManager::Surface> latest;
     std::shared_ptr<D3D11SurfaceManager::Surface> imported;
     std::vector<uint8_t> pixels;
@@ -107,10 +108,11 @@ class VideoOutput {
   mpv_render_context* render_context_ = nullptr;
   flutter::TextureRegistrar* registrar_ = nullptr;
   ThreadPool* thread_pool_ref_ = nullptr;
-  // The manager outlives its outputs. During engine shutdown, unregister owns
-  // retired resources but the platform thread must not wait for its callback.
+  // The manager outlives its outputs. Unregister callbacks retain retired textures.
+  // During shutdown, let the platform thread return to the engine.
+  // The engine can then finish the callbacks.
   const std::atomic<bool>* shutting_down_ = nullptr;
-  // Serializes accepting render notifications with the teardown barrier.
+  // Use this lock to stop new render requests before teardown.
   std::mutex notification_mutex_;
   bool render_queued_ = false;  // Protected by notification_mutex_.
   std::atomic<bool> destroyed_{false};
@@ -119,9 +121,9 @@ class VideoOutput {
   int software_rotation_ = 0;
   std::vector<uint8_t> unrotated_pixels_;
   std::shared_ptr<TextureRegistration> texture_;
-  // Unregister callbacks own only their generation, never this output.
+  // Each unregister callback retains only its own texture registration.
   std::vector<std::future<void>> retirements_;
-  // Reports the initial texture and subsequent texture or dimension changes.
+  // Report the first texture. Report later changes to the texture or its size.
   std::function<void(int64_t, int64_t, int64_t)> texture_update_callback_ =
       [](int64_t, int64_t, int64_t) {};
 };

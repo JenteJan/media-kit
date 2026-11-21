@@ -55,12 +55,11 @@ void VideoOutputManager::Dispose(int64_t handle,
 }
 
 VideoOutputManager::~VideoOutputManager() {
-  // The engine may finish unregister callbacks only after this destructor
-  // returns to its platform thread. Callbacks retain their resources
-  // themselves.
+  // The engine can finish unregister callbacks after this destructor returns.
+  // Each callback retains its own resources.
   shutting_down_ = true;
-  // Stop accepting work and join the control worker before touching its map.
+  // Join the control worker before accessing its output map.
   operations_.reset();
-  // |VideoOutput| destructor will do the relevant cleanup.
+  // Each output releases its resources in its destructor.
   video_outputs_.clear();
 }

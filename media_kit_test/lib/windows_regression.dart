@@ -1,8 +1,8 @@
-// Generate the default 90-second clips with tool/prepare_windows_six.ps1.
-// flutter run -d windows -t lib/windows_regression.dart opens all six.
-// The Release executable accepts --auto, --benchmark, --cpu-decoding, and
-// --software. Positional paths replace the demo clips; --minute validates
-// one minute of uninterrupted playback with those paths too.
+// Run tool/prepare_windows_six.ps1 to generate six 90-second clips.
+// Run `flutter run -d windows -t lib/windows_regression.dart` to play them.
+// The Release executable accepts --auto, --benchmark, --cpu-decoding, and --software.
+// Pass file paths to replace the demo clips.
+// Use --minute to check one minute of uninterrupted playback.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -33,8 +33,8 @@ void main(List<String> arguments) {
   ));
 }
 
-// The Release executable is usually nested inside the checkout; a packaged
-// demo may place the same six-videos folder alongside its executable.
+// Look for the demo clips in the checkout.
+// A packaged application can keep the six-videos directory beside the executable.
 List<String> findSixClips() {
   const names = [
     '01-landscape-h264.mp4',
@@ -247,8 +247,8 @@ class _WindowsRegressionState extends State<WindowsRegression> {
   Future<void> disposeSequentially() async {
     for (var i = 0; i < slots.length; ++i) {
       await disposeSlot(i);
-      // The other five continue playing for five seconds before this slot is
-      // recreated. Only then move to the next slot.
+      // Keep the other five players running for five seconds.
+      // Recreate this slot before testing the next one.
       await checkProgress(duration: const Duration(seconds: 5));
       await openSix();
       final restarted = slots[i]!;

@@ -1,5 +1,5 @@
-// Exercise production output/manager code with injected mpv and registrar
-// failures. D3D11 resources are real; no Flutter engine is required.
+// Test output lifetime with real D3D11 resources.
+// Simulate mpv and registration failures without starting a Flutter engine.
 #include "../video_output_manager.h"
 
 #include <chrono>
@@ -207,8 +207,8 @@ void TestFailures(bool hardware) {
   worker.Post([] {}).get();
   Check(current_id == first_id && registrar.Count() == 1,
         "failed replacement published or retired a texture");
-  // Return to the original size after a failed registration. Rendering must
-  // still target the original surface, not an unpublished replacement.
+  // Restore the original size after registration fails.
+  // The renderer must still use the original surface.
   output->SetSize(64, 36);
   worker.Post([] {}).get();
   registrar.Read(first_id, 64, 36);
@@ -237,9 +237,9 @@ void TestFailures(bool hardware) {
         "dispose leaked resources");
 }
 
-// Exercise the registered mpv update callback and the real manager queues.
-// Gate the first render so the whole burst arrives while it is in flight.
-// Resize is measured at the new-size notification; dispose at its completion.
+// Trigger the registered mpv callback while the first render waits.
+// Measure resize latency when the manager reports the new size.
+// Measure disposal latency when the completion callback runs.
 void MeasureRenderQueue(bool resize, int notifications) {
   using Clock = std::chrono::steady_clock;
   constexpr auto render_delay = 20ms;
@@ -297,8 +297,8 @@ void MeasureRenderQueue(bool resize, int notifications) {
       std::chrono::duration<double, std::milli>(completion.get() - start)
           .count();
 
-  // Dispose B after its resize frame has been drawn. A stays alive until its
-  // outstanding renders have completed on the shared worker.
+  // Dispose B after its resize frame completes.
+  // Keep A alive until the shared worker finishes its renders.
   if (resize) {
     std::promise<void> disposed;
     manager.Dispose(2, [&] { disposed.set_value(); });
@@ -362,8 +362,9 @@ int main(int argc, char** argv) {
       registrar.defer = true;
       manager->Dispose(1, [&] { disposed.set_value(); });
       registrar.WaitForRetirement();
-      // Simulate the platform thread destroying the manager while completion
-      // requires that thread to return to the engine. CTest bounds deadlocks.
+      // Destroy the manager on the platform thread.
+      // The engine can complete the callback after this thread returns.
+      // CTest sets a time limit for this check.
       manager.reset();
       disposed.get_future().get();
       registrar.Read(0, 64, 36);

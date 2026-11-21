@@ -42,8 +42,8 @@ bool PlatformTaskRunner::Post(std::function<void()> task) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!window_)
     return false;
-  // Enqueue only when a wakeup was accepted. The platform thread cannot drain
-  // the queue until this lock is released.
+  // Queue the task only if Windows accepts the wakeup message.
+  // The platform thread can drain the queue after we release this lock.
   if (!PostMessageW(window_, kTaskMessage, 0, 0))
     return false;
   tasks_.push(std::move(task));

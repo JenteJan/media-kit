@@ -15,7 +15,7 @@ namespace media_kit_video {
 namespace {
 using Microsoft::WRL::ComPtr;
 
-// New SDKs expose the engine adapter even before the first view exists.
+// Recent Flutter SDKs expose the engine adapter before Flutter creates a view.
 template <class Registrar>
 auto GraphicsAdapter(Registrar* registrar, int)
     -> decltype(registrar->GetGraphicsAdapter(
@@ -57,9 +57,8 @@ MediaKitVideoPlugin::MediaKitVideoPlugin(
 
 MediaKitVideoPlugin::~MediaKitVideoPlugin() {
   shutting_down_ = true;
-  // The engine owns this plugin's lifetime and invalidates its messenger
-  // before invoking registrar destruction callbacks. Its dispatcher is torn
-  // down by the engine; do not call SetMethodCallHandler during destruction.
+  // The engine invalidates the messenger before it destroys the plugin.
+  // The engine removes the dispatcher. Leave the method handler alone here.
   video_output_manager_.reset();
   platform_tasks_.Close();
 }

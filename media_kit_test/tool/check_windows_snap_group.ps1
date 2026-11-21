@@ -1,5 +1,5 @@
-# Run against the three-window Flutter example after all nine players have opened.
-# Captures only video tile interiors belonging to the supplied process.
+# Open all nine players in the three test windows before running this script.
+# Capture the video tiles from the specified process.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][int]$ProcessId,
@@ -56,8 +56,8 @@ public static class SnapTest {
             if (attached) AttachThreadInput(self, foreground, false);
         }
         if (GetForegroundWindow() == hwnd) return;
-        // The Win32 foreground lock can reject programmatic activation from
-        // the helper process. Click only a verified caption of this test HWND.
+        // Windows can block foreground activation from a helper process.
+        // Verify the test window handle before clicking its title bar.
         Rect frame;
         Point previous;
         if (!GetCursorPos(out previous) || DwmGetWindowAttribute(hwnd, 9, out frame, 16) != 0) return;
@@ -151,8 +151,8 @@ try {
         for ($tile = 0; $tile -lt 3; $tile++) {
             $cx = $origin.X + [int](($tile + 0.5) * $client.Right / 3)
             $cy = $origin.Y + [int]($client.Bottom * 0.54)
-            # Sample across the video. The center of testsrc2 can be a single
-            # stationary color even while other parts of the frame are moving.
+            # Sample several parts of the frame. The center can keep the same color
+            # while other parts change.
             $w = [int]($client.Right / 3 * 0.86)
             $h = [int]($client.Bottom * 0.52)
             $regions += [pscustomobject]@{
@@ -213,7 +213,7 @@ try {
     }
     [ordered]@{ processId=$ProcessId; windowBounds=$bounds; changedPixelsOf1024=$motion } |
         ConvertTo-Json -Depth 4 | Set-Content (Join-Path $out 'snap-group.json')
-    # Save only the test windows, arranged at their verified screen coordinates.
+    # Save the test windows at their verified screen positions.
     $group = [Drawing.Bitmap]::new($work.Width, $work.Height)
     $canvas = [Drawing.Graphics]::FromImage($group)
     try {
