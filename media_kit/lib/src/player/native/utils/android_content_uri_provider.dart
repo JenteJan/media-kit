@@ -52,10 +52,11 @@ abstract class AndroidContentUriProvider {
 
   /// Closes the file descriptor of the content:// URI.
   static Future<void> closeFileDescriptor(
-      String contentUriOrFileDescriptorUri) async {
-    final contentUri = _contentUrisByFileDescriptorUri[
-            contentUriOrFileDescriptorUri] ??
-        contentUriOrFileDescriptorUri;
+    String contentUriOrFileDescriptorUri,
+  ) async {
+    final contentUri =
+        _contentUrisByFileDescriptorUri[contentUriOrFileDescriptorUri] ??
+            contentUriOrFileDescriptorUri;
     final fileDescriptor = _fileDescriptorsByContentUri[contentUri];
     if (fileDescriptor != null) {
       _fileDescriptorsByContentUri.remove(contentUri);
@@ -66,9 +67,9 @@ abstract class AndroidContentUriProvider {
 
   /// Closes the file descriptor of the content:// URI.
   static void closeFileDescriptorSync(String contentUriOrFileDescriptorUri) {
-    final contentUri = _contentUrisByFileDescriptorUri[
-            contentUriOrFileDescriptorUri] ??
-        contentUriOrFileDescriptorUri;
+    final contentUri =
+        _contentUrisByFileDescriptorUri[contentUriOrFileDescriptorUri] ??
+            contentUriOrFileDescriptorUri;
     final fileDescriptor = _fileDescriptorsByContentUri[contentUri];
     if (fileDescriptor != null) {
       _fileDescriptorsByContentUri.remove(contentUri);

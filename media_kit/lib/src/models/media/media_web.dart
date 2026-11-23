@@ -7,6 +7,7 @@
 import 'dart:collection';
 import 'dart:js_interop';
 import 'dart:typed_data';
+
 import 'package:web/web.dart' as html;
 
 import 'package:media_kit/src/models/playable.dart';
@@ -116,30 +117,16 @@ class Media extends Playable {
       httpHeaders: this.httpHeaders,
     );
     // Attach [this] instance to [Finalizer].
-    _finalizer.attach(
-      this,
-      _MediaFinalizerContext(
-        uri,
-        memory,
-      ),
-    );
+    _finalizer.attach(this, _MediaFinalizerContext(uri, memory));
   }
 
   /// Creates a [Media] instance from [Uint8List].
   ///
   /// The [type] parameter is optional and is used to specify the MIME type of the media on web.
-  static Future<Media> memory(
-    Uint8List data, {
-    String? type,
-  }) {
+  static Future<Media> memory(Uint8List data, {String? type}) {
     final blob = html.Blob(<JSUint8Array>[data.toJS].toJS);
     final object = html.URL.createObjectURL(blob);
-    return Future.value(
-      Media._(
-        object,
-        memory: true,
-      ),
-    );
+    return Future.value(Media._(object, memory: true));
   }
 
   /// Normalizes the passed URI.
@@ -212,10 +199,7 @@ class _MediaCache {
   final Map<String, String>? httpHeaders;
 
   /// {@macro _media_cache}
-  const _MediaCache({
-    this.extras,
-    this.httpHeaders,
-  });
+  const _MediaCache({this.extras, this.httpHeaders});
 
   @override
   String toString() => '_MediaCache('

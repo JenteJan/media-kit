@@ -5,6 +5,7 @@
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 // ignore_for_file: non_constant_identifier_names
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -407,37 +408,28 @@ class _MaterialDesktopVideoControlsState
       mount = _theme(context).visibleOnMount;
       visible = _theme(context).visibleOnMount;
 
-      subscriptions.addAll(
-        [
-          controller(context).player.stream.playlist.listen(
-            (event) {
-              setState(() {
-                playlist = event;
-              });
-            },
-          ),
-          controller(context).player.stream.buffering.listen(
-            (event) {
-              setState(() {
-                buffering = event;
-              });
-            },
-          ),
-        ],
-      );
+      subscriptions.addAll([
+        controller(context).player.stream.playlist.listen((event) {
+          setState(() {
+            playlist = event;
+          });
+        }),
+        controller(context).player.stream.buffering.listen((event) {
+          setState(() {
+            buffering = event;
+          });
+        }),
+      ]);
 
       if (_theme(context).visibleOnMount) {
-        _timer = Timer(
-          _theme(context).controlsHoverDuration,
-          () {
-            if (mounted) {
-              setState(() {
-                visible = false;
-              });
-              unshiftSubtitle();
-            }
-          },
-        );
+        _timer = Timer(_theme(context).controlsHoverDuration, () {
+          if (mounted) {
+            setState(() {
+              visible = false;
+            });
+            unshiftSubtitle();
+          }
+        });
       }
     }
   }
@@ -454,12 +446,7 @@ class _MaterialDesktopVideoControlsState
     if (_theme(context).shiftSubtitlesOnControlsVisibilityChange) {
       state(context).setSubtitleViewPadding(
         state(context).widget.subtitleViewConfiguration.padding +
-            EdgeInsets.fromLTRB(
-              0.0,
-              0.0,
-              0.0,
-              subtitleVerticalShiftOffset,
-            ),
+            EdgeInsets.fromLTRB(0.0, 0.0, 0.0, subtitleVerticalShiftOffset),
       );
     }
   }
@@ -536,8 +523,9 @@ class _MaterialDesktopVideoControlsState
                   controller(context).player.playOrPause(),
               const SingleActivator(LogicalKeyboardKey.mediaTrackNext): () =>
                   controller(context).player.next(),
-              const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious):
-                  () => controller(context).player.previous(),
+              const SingleActivator(
+                LogicalKeyboardKey.mediaTrackPrevious,
+              ): () => controller(context).player.previous(),
               const SingleActivator(LogicalKeyboardKey.space): () =>
                   controller(context).player.playOrPause(),
               const SingleActivator(LogicalKeyboardKey.keyJ): () {
@@ -614,8 +602,9 @@ class _MaterialDesktopVideoControlsState
                       : (TapDownDetails details) {
                           final RenderBox box =
                               context.findRenderObject() as RenderBox;
-                          final Offset localPosition =
-                              box.globalToLocal(details.globalPosition);
+                          final Offset localPosition = box.globalToLocal(
+                            details.globalPosition,
+                          );
                           const double tapPadding = 10.0;
                           if (!mount ||
                               localPosition.dy <
@@ -687,10 +676,7 @@ class _MaterialDesktopVideoControlsState
                                     gradient: LinearGradient(
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
-                                      stops: [
-                                        0.0,
-                                        0.2,
-                                      ],
+                                      stops: [0.0, 0.2],
                                       colors: [
                                         Color(0x61000000),
                                         Color(0x00000000),
@@ -705,10 +691,7 @@ class _MaterialDesktopVideoControlsState
                                     gradient: LinearGradient(
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
-                                      stops: [
-                                        0.5,
-                                        1.0,
-                                      ],
+                                      stops: [0.5, 1.0],
                                       colors: [
                                         Color(0x00000000),
                                         Color(0x61000000),
@@ -888,11 +871,7 @@ class MaterialDesktopSeekBar extends StatefulWidget {
   final VoidCallback? onSeekStart;
   final VoidCallback? onSeekEnd;
 
-  const MaterialDesktopSeekBar({
-    super.key,
-    this.onSeekStart,
-    this.onSeekEnd,
-  });
+  const MaterialDesktopSeekBar({super.key, this.onSeekStart, this.onSeekEnd});
 
   @override
   MaterialDesktopSeekBarState createState() => MaterialDesktopSeekBarState();
@@ -921,35 +900,33 @@ class MaterialDesktopSeekBarState extends State<MaterialDesktopSeekBar> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (subscriptions.isEmpty) {
-      subscriptions.addAll(
-        [
-          controller(context).player.stream.playing.listen((event) {
-            setState(() {
-              playing = event;
-            });
-          }),
-          controller(context).player.stream.completed.listen((event) {
-            setState(() {
-              position = Duration.zero;
-            });
-          }),
-          controller(context).player.stream.position.listen((event) {
-            setState(() {
-              if (!click) position = event;
-            });
-          }),
-          controller(context).player.stream.duration.listen((event) {
-            setState(() {
-              duration = event;
-            });
-          }),
-          controller(context).player.stream.buffer.listen((event) {
-            setState(() {
-              buffer = event;
-            });
-          }),
-        ],
-      );
+      subscriptions.addAll([
+        controller(context).player.stream.playing.listen((event) {
+          setState(() {
+            playing = event;
+          });
+        }),
+        controller(context).player.stream.completed.listen((event) {
+          setState(() {
+            position = Duration.zero;
+          });
+        }),
+        controller(context).player.stream.position.listen((event) {
+          setState(() {
+            if (!click) position = event;
+          });
+        }),
+        controller(context).player.stream.duration.listen((event) {
+          setState(() {
+            duration = event;
+          });
+        }),
+        controller(context).player.stream.buffer.listen((event) {
+          setState(() {
+            buffer = event;
+          });
+        }),
+      ]);
     }
   }
 
@@ -1420,14 +1397,14 @@ class MaterialDesktopVolumeButtonState
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {
             if (event.scrollDelta.dy < 0) {
-              controller(context).player.setVolume(
-                    (volume + 5.0).clamp(0.0, 100.0),
-                  );
+              controller(context)
+                  .player
+                  .setVolume((volume + 5.0).clamp(0.0, 100.0));
             }
             if (event.scrollDelta.dy > 0) {
-              controller(context).player.setVolume(
-                    (volume - 5.0).clamp(0.0, 100.0),
-                  );
+              controller(context)
+                  .player
+                  .setVolume((volume - 5.0).clamp(0.0, 100.0));
             }
           }
         },
@@ -1563,20 +1540,18 @@ class MaterialDesktopPositionIndicatorState
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (subscriptions.isEmpty) {
-      subscriptions.addAll(
-        [
-          controller(context).player.stream.position.listen((event) {
-            setState(() {
-              position = event;
-            });
-          }),
-          controller(context).player.stream.duration.listen((event) {
-            setState(() {
-              duration = event;
-            });
-          }),
-        ],
-      );
+      subscriptions.addAll([
+        controller(context).player.stream.position.listen((event) {
+          setState(() {
+            position = event;
+          });
+        }),
+        controller(context).player.stream.duration.listen((event) {
+          setState(() {
+            duration = event;
+          });
+        }),
+      ]);
     }
   }
 
@@ -1615,11 +1590,6 @@ class _CustomTrackShape extends RoundedRectSliderTrackShape {
     final left = offset.dx;
     final top = offset.dy + (parentBox.size.height - height!) / 2;
     final width = parentBox.size.width;
-    return Rect.fromLTWH(
-      left,
-      top,
-      width,
-      height,
-    );
+    return Rect.fromLTWH(left, top, width, height);
   }
 }

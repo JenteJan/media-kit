@@ -5,6 +5,7 @@
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 import 'dart:async';
 import 'dart:js_interop';
+
 import 'package:web/web.dart' as web;
 import 'package:synchronized/synchronized.dart';
 
@@ -92,9 +93,7 @@ extension on XHRSetupCallback {
 @anonymous
 @staticInterop
 class HlsOptions {
-  external factory HlsOptions({
-    XHRSetupCallback? xhrSetup,
-  });
+  external factory HlsOptions({XHRSetupCallback? xhrSetup});
 }
 
 @JS()

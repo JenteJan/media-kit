@@ -54,21 +54,17 @@ class _VideoViewParametersScreenState extends State<VideoViewParametersScreen> {
           child: ElevatedButton(
             onPressed: () {
               if (fitTimer == null) {
-                fitTimer = Timer.periodic(
-                  const Duration(seconds: 1),
-                  (timer) {
-                    if (timer.tick % 3 == 0 /* Every 3 seconds. */) {
-                      fit =
-                          fit == BoxFit.contain ? BoxFit.none : BoxFit.contain;
-                      setState(() {});
-                    }
-                    if (mounted) {
-                      setState(() {
-                        fitTick = timer.tick;
-                      });
-                    }
-                  },
-                );
+                fitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                  if (timer.tick % 3 == 0 /* Every 3 seconds. */) {
+                    fit = fit == BoxFit.contain ? BoxFit.none : BoxFit.contain;
+                    setState(() {});
+                  }
+                  if (mounted) {
+                    setState(() {
+                      fitTick = timer.tick;
+                    });
+                  }
+                });
               } else {
                 fitTimer?.cancel();
                 fitTimer = null;
@@ -87,25 +83,24 @@ class _VideoViewParametersScreenState extends State<VideoViewParametersScreen> {
           child: ElevatedButton(
             onPressed: () {
               if (fontSizeTimer == null) {
-                fontSizeTimer = Timer.periodic(
-                  const Duration(seconds: 1),
-                  (timer) {
-                    if (timer.tick % 3 == 0 /* Every 3 seconds. */) {
-                      key.currentState?.update(
-                        subtitleViewConfiguration: SubtitleViewConfiguration(
-                            style: TextStyle(
+                fontSizeTimer =
+                    Timer.periodic(const Duration(seconds: 1), (timer) {
+                  if (timer.tick % 3 == 0 /* Every 3 seconds. */) {
+                    key.currentState?.update(
+                      subtitleViewConfiguration: SubtitleViewConfiguration(
+                        style: TextStyle(
                           // font size increases every 3 seconds
                           fontSize: fontSizeFromTick(timer.tick),
-                        )),
-                      );
-                    }
-                    if (mounted) {
-                      setState(() {
-                        fontSizeTick = timer.tick;
-                      });
-                    }
-                  },
-                );
+                        ),
+                      ),
+                    );
+                  }
+                  if (mounted) {
+                    setState(() {
+                      fontSizeTick = timer.tick;
+                    });
+                  }
+                });
               } else {
                 fontSizeTimer?.cancel();
                 fontSizeTimer = null;
@@ -129,9 +124,7 @@ class _VideoViewParametersScreenState extends State<VideoViewParametersScreen> {
     final horizontal =
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('package:media_kit'),
-      ),
+      appBar: AppBar(title: const Text('package:media_kit')),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
@@ -181,12 +174,7 @@ class _VideoViewParametersScreenState extends State<VideoViewParametersScreen> {
                     ),
                   ),
                   const VerticalDivider(width: 1.0, thickness: 1.0),
-                  Expanded(
-                    flex: 1,
-                    child: ListView(
-                      children: items,
-                    ),
-                  ),
+                  Expanded(flex: 1, child: ListView(children: items)),
                 ],
               )
             : ListView(

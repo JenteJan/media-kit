@@ -18,21 +18,19 @@ curl --fail --location https://raw.githubusercontent.com/mpv-player/mpv/v0.42.0/
 SHA-256: `3da9b8c61c3fb4e2d76bd248cebf72f3ee830331411b71a76adbd5e05660cc50`.
 No render or stream headers are needed by these Dart bindings.
 
-ffigen requires Dart >=3.10; the checked-in tool dependency lock currently
-requires Dart >=3.11. This standalone tool package is intentionally outside the
-Pub workspace, so `media_kit` retains its Dart ^3.6.0 requirement. Install a C
-compiler and libclang (Xcode on macOS, LLVM on Linux/Windows), then run:
+The generator shares dependency resolution with the root Pub workspace.
+Install a C compiler and libclang (Xcode on macOS, LLVM on Linux/Windows),
+then run from the repository root:
 
 ```sh
+dart pub get
 cd tools/media_kit_libmpv_generator
-dart pub get --enforce-lockfile
 dart run ffigen.dart
 dart test
 ```
 
 Output goes directly to `media_kit/lib/generated/libmpv/bindings.dart`; paths
-are resolved relative to the script. Commit the tool lockfile for repeatable
-dependency resolution. ffigen's warning about the missing definition of
+are resolved relative to the script. ffigen's warning about the missing definition of
 `mpv_handle` is expected: it is an opaque C handle.
 
 ## Compatibility

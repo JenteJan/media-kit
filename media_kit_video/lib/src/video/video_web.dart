@@ -7,7 +7,9 @@
 import 'dart:js_interop';
 
 import 'package:web/web.dart';
+
 import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -253,9 +255,8 @@ class VideoState extends State<Video> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     videoViewParametersNotifier =
-        media_kit_video_controls.VideoStateInheritedWidget.maybeOf(
-              context,
-            )?.videoViewParametersNotifier ??
+        media_kit_video_controls.VideoStateInheritedWidget.maybeOf(context)
+                ?.videoViewParametersNotifier ??
             ValueNotifier<VideoViewParameters>(
               VideoViewParameters(
                 width: widget.width,
@@ -271,9 +272,8 @@ class VideoState extends State<Video> with WidgetsBindingObserver {
               ),
             );
     _disposeNotifiers =
-        media_kit_video_controls.VideoStateInheritedWidget.maybeOf(
-              context,
-            )?.disposeNotifiers ??
+        media_kit_video_controls.VideoStateInheritedWidget.maybeOf(context)
+                ?.disposeNotifiers ??
             true;
     super.didChangeDependencies();
   }
@@ -307,47 +307,39 @@ class VideoState extends State<Video> with WidgetsBindingObserver {
     // --------------------------------------------------
     // Do not show the video frame until width & height are available.
     // Since [ValueNotifier<Rect?>] inside [VideoController] only gets updated by the render loop (i.e. it will not fire when video's width & height are not available etc.), it's important to handle this separately here.
-    _subscriptions.addAll(
-      [
-        widget.controller.player.stream.width.listen(
-          (value) {
-            _width = value;
-            final visible = (_width ?? 0) > 0 && (_height ?? 0) > 0;
-            if (_visible != visible) {
-              setState(() {
-                _visible = visible;
-              });
-            }
-          },
-        ),
-        widget.controller.player.stream.height.listen(
-          (value) {
-            _height = value;
-            final visible = (_width ?? 0) > 0 && (_height ?? 0) > 0;
-            if (_visible != visible) {
-              setState(() {
-                _visible = visible;
-              });
-            }
-          },
-        ),
-      ],
-    );
+    _subscriptions.addAll([
+      widget.controller.player.stream.width.listen((value) {
+        _width = value;
+        final visible = (_width ?? 0) > 0 && (_height ?? 0) > 0;
+        if (_visible != visible) {
+          setState(() {
+            _visible = visible;
+          });
+        }
+      }),
+      widget.controller.player.stream.height.listen((value) {
+        _height = value;
+        final visible = (_width ?? 0) > 0 && (_height ?? 0) > 0;
+        if (_visible != visible) {
+          setState(() {
+            _visible = visible;
+          });
+        }
+      }),
+    ]);
     // --------------------------------------------------
     if (widget.wakelock) {
       if (widget.controller.player.state.playing) {
         _wakelock.enable();
       }
       _subscriptions.add(
-        widget.controller.player.stream.playing.listen(
-          (value) {
-            if (value) {
-              _wakelock.enable();
-            } else {
-              _wakelock.disable();
-            }
-          },
-        ),
+        widget.controller.player.stream.playing.listen((value) {
+          if (value) {
+            _wakelock.enable();
+          } else {
+            _wakelock.disable();
+          }
+        }),
       );
     }
   }

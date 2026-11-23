@@ -22,8 +22,9 @@ Future<void> enterFullscreen(BuildContext context) {
       if (context.mounted) {
         final stateValue = state(context);
         final contextNotifierValue = contextNotifier(context);
-        final videoViewParametersNotifierValue =
-            videoViewParametersNotifier(context);
+        final videoViewParametersNotifierValue = videoViewParametersNotifier(
+          context,
+        );
         final controllerValue = controller(context);
         Navigator.of(context, rootNavigator: true).push(
           PageRouteBuilder(

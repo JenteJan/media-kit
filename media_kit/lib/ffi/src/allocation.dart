@@ -22,8 +22,9 @@ final PosixCalloc posixCalloc =
 
 typedef PosixFreeNative = Void Function(Pointer);
 typedef PosixFree = void Function(Pointer);
-final PosixFree posixFree =
-    stdlib.lookupFunction<PosixFreeNative, PosixFree>('free');
+final PosixFree posixFree = stdlib.lookupFunction<PosixFreeNative, PosixFree>(
+  'free',
+);
 
 typedef WinGetProcessHeapFn = Pointer Function();
 final WinGetProcessHeapFn winGetProcessHeap = stdlib
@@ -36,7 +37,10 @@ final WinHeapAlloc winHeapAlloc =
     stdlib.lookupFunction<WinHeapAllocNative, WinHeapAlloc>('HeapAlloc');
 
 typedef WinHeapFreeNative = Int32 Function(
-    Pointer heap, Uint32 flags, Pointer memory);
+  Pointer heap,
+  Uint32 flags,
+  Pointer memory,
+);
 typedef WinHeapFree = int Function(Pointer heap, int flags, Pointer memory);
 final WinHeapFree winHeapFree =
     stdlib.lookupFunction<WinHeapFreeNative, WinHeapFree>('HeapFree');
@@ -127,8 +131,11 @@ class _CallocAllocator implements Allocator {
   Pointer<T> allocate<T extends NativeType>(int byteCount, {int? alignment}) {
     Pointer<T> result;
     if (Platform.isWindows) {
-      result = winHeapAlloc(processHeap, /*flags=*/ HEAP_ZERO_MEMORY, byteCount)
-          .cast();
+      result = winHeapAlloc(
+        processHeap,
+        /*flags=*/ HEAP_ZERO_MEMORY,
+        byteCount,
+      ).cast();
     } else {
       result = posixCalloc(byteCount, 1).cast();
     }

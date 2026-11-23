@@ -24,6 +24,4 @@ String convertBytesToURL(Uint8List bytes) {
   return object;
 }
 
-final ValueNotifier<String> progress = ValueNotifier<String>(
-  '',
-);
+final ValueNotifier<String> progress = ValueNotifier<String>('');

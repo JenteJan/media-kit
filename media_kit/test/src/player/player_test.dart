@@ -1766,10 +1766,14 @@ void main() {
             unorderedEquals(playable.medias.map((media) => media.extras)),
           );
           expect(
-              shuffled.medias[shuffled.index], playable.medias[playable.index]);
+            shuffled.medias[shuffled.index],
+            playable.medias[playable.index],
+          );
 
-          orderChanged = !const ListEquality<Media>()
-              .equals(shuffled.medias, playable.medias);
+          orderChanged = !const ListEquality<Media>().equals(
+            shuffled.medias,
+            playable.medias,
+          );
           // Playlist streams suppress equal consecutive values with distinct.
           if (shuffled != playable) {
             expectedPlaylists.addAll([shuffled, playable]);
@@ -1791,9 +1795,11 @@ void main() {
           if (orderChanged) break;
         }
         if (length > 1) {
-          expect(orderChanged, isTrue,
-              reason:
-                  'Shuffle kept the original order in all $attempts attempts');
+          expect(
+            orderChanged,
+            isTrue,
+            reason: 'Shuffle kept the original order in all $attempts attempts',
+          );
         }
       } finally {
         await player.dispose();

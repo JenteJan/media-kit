@@ -21,12 +21,10 @@ import 'tests/11.video_view_parameters.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
-  await SystemChrome.setPreferredOrientations(
-    [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ],
-  );
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const MyApp(DownloadingScreen()));
   await prepareSources();
   runApp(const MyApp(PrimaryScreen()));
@@ -136,11 +134,9 @@ class PrimaryScreen extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const TabsTest(),
-                ),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (context) => const TabsTest()));
             },
           ),
           ListTile(
@@ -195,9 +191,7 @@ class PrimaryScreen extends StatelessWidget {
               ),
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const Screenshot(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const Screenshot()),
                 );
               },
             ),
@@ -209,11 +203,9 @@ class PrimaryScreen extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const Seamless(),
-                ),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (context) => const Seamless()));
             },
           ),
           ListTile(
@@ -258,9 +250,7 @@ class DownloadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('package:media_kit'),
-      ),
+      appBar: AppBar(title: const Text('package:media_kit')),
       body: Center(
         child: ValueListenableBuilder<String>(
           valueListenable: progress,
@@ -272,10 +262,7 @@ class DownloadingScreen extends StatelessWidget {
             children: [
               child!,
               const SizedBox(height: 16.0),
-              Text(
-                progress,
-                style: const TextStyle(fontSize: 14.0),
-              ),
+              Text(progress, style: const TextStyle(fontSize: 14.0)),
             ],
           ),
         ),

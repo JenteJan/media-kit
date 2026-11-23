@@ -44,10 +44,7 @@ class VideoStateInheritedWidget extends InheritedWidget {
 
   static VideoStateInheritedWidget of(BuildContext context) {
     final VideoStateInheritedWidget? result = maybeOf(context);
-    assert(
-      result != null,
-      'No [VideoStateInheritedWidget] found in [context]',
-    );
+    assert(result != null, 'No [VideoStateInheritedWidget] found in [context]');
     return result!;
   }
 

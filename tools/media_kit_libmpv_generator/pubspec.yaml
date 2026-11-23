@@ -2,6 +2,7 @@ name: media_kit_libmpv_generator
 publish_to: none
 environment:
   sdk: ^3.10.0
+resolution: workspace
 
 dependencies:
   ffigen: 23.0.0

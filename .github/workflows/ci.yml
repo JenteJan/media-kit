@@ -232,7 +232,7 @@ jobs:
         with:
           submodules: "true"
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: "zulu"
           java-version: "17"
@@ -395,7 +395,7 @@ jobs:
         with:
           submodules: "true"
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: "zulu"
           java-version: "17"
@@ -431,7 +431,6 @@ jobs:
         shell: cmd
       - run: flutter pub get
       - run: flutter build windows --verbose
-        # TODO(@alexmercerind): package:media_kit_video won't build with package:media_kit_libs_windows_audio due to missing ANGLE headers.
         continue-on-error: true
 
   audio-libs-linux:
@@ -512,7 +511,7 @@ jobs:
         with:
           submodules: "true"
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: "zulu"
           java-version: "17"

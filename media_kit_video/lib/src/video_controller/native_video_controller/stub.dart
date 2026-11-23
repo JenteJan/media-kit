@@ -12,10 +12,7 @@ import 'package:media_kit_video/src/video_controller/platform_video_controller.d
 class NativeVideoController extends PlatformVideoController {
   static const bool supported = false;
 
-  NativeVideoController._(
-    super.player,
-    super.configuration,
-  );
+  NativeVideoController._(super.player, super.configuration);
 
   static Future<PlatformVideoController> create(
     Player player,

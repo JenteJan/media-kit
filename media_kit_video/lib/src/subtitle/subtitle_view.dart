@@ -5,6 +5,7 @@
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import 'package:media_kit_video/src/video_controller/video_controller.dart';
@@ -153,11 +154,6 @@ class SubtitleViewConfiguration {
     ),
     this.textAlign = TextAlign.center,
     this.textScaler,
-    this.padding = const EdgeInsets.fromLTRB(
-      16.0,
-      0.0,
-      16.0,
-      24.0,
-    ),
+    this.padding = const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 24.0),
   });
 }

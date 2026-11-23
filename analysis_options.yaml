@@ -1,4 +1,5 @@
 analyzer:
   exclude:
-    # Local build artifacts and source snapshots used for regression comparisons.
-    - build/**
+    - '**/build/**'
+formatter:
+  page_width: 80

@@ -23,26 +23,26 @@ set(LIBMPV_IMPORT_LIBRARY "${LIBMPV_SRC}/libmpv.dll.a")
 set(PLUGIN_SOURCES)
 if(MEDIA_KIT_LIBS_AVAILABLE)
   list(APPEND PLUGIN_SOURCES
-    "d3d11_surface_manager.cpp"
+    "d3d11_surface_manager.cc"
     "d3d11_surface_manager.h"
-    "media_kit_video_plugin.cpp"
-    "platform_task_runner.cpp"
+    "media_kit_video_plugin.cc"
+    "platform_task_runner.cc"
     "platform_task_runner.h"
     "media_kit_video_plugin.h"
     "thread_pool.h"
     "video_frame_size.h"
-    "video_output_manager.cpp"
+    "video_output_manager.cc"
     "video_output_manager.h"
-    "video_output.cpp"
+    "video_output.cc"
     "video_output.h"
-    "utils.cpp"
+    "utils.cc"
     "utils.h"
   )
 endif()
 
 add_library(${PLUGIN_NAME} SHARED
   "include/media_kit_video/media_kit_video_plugin_c_api.h"
-  "media_kit_video_plugin_c_api.cpp"
+  "media_kit_video_plugin_c_api.cc"
   ${PLUGIN_SOURCES}
 )
 
@@ -74,9 +74,3 @@ else()
 endif()
 
 set(media_kit_video_bundled_libraries "" PARENT_SCOPE)
-
-# Set include_media_kit_video_tests to build the native tests.
-if(include_media_kit_video_tests)
-  enable_testing()
-  add_subdirectory(test)
-endif()

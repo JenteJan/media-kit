@@ -38,19 +38,22 @@ void main() {
     await expectLater(player.setVolume(50), throwsA(isA<AssertionError>()));
   });
 
-  test('dispose during initialization and repeat dispose finish once',
-      () async {
-    final player = Player();
-    var released = 0;
-    player.platform!.release.add(() async => released++);
-    await Future.wait([player.dispose(), player.dispose()])
-        .timeout(const Duration(seconds: 5));
-    expect(released, 1);
-  });
+  test(
+    'dispose during initialization and repeat dispose finish once',
+    () async {
+      final player = Player();
+      var released = 0;
+      player.platform!.release.add(() async => released++);
+      await Future.wait([player.dispose(), player.dispose()])
+          .timeout(const Duration(seconds: 5));
+      expect(released, 1);
+    },
+  );
 
   test('cleanup callbacks may remove themselves', () async {
-    final player =
-        Player(configuration: const PlayerConfiguration(async: false));
+    final player = Player(
+      configuration: const PlayerConfiguration(async: false),
+    );
     var released = 0;
     late Future<void> Function() first;
     first = () async {

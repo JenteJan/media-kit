@@ -28,14 +28,10 @@ abstract class AndroidHelper {
         // * libmediakitandroidhelper.so.
         DynamicLibrary? libmpv, libavcodec, libmediakitandroidhelper;
         try {
-          libmpv = DynamicLibrary.open(
-            'libmpv.so',
-          );
+          libmpv = DynamicLibrary.open('libmpv.so');
         } catch (_) {}
         try {
-          libavcodec = DynamicLibrary.open(
-            'libavcodec.so',
-          );
+          libavcodec = DynamicLibrary.open('libavcodec.so');
         } catch (_) {}
         try {
           libmediakitandroidhelper = DynamicLibrary.open(
@@ -45,9 +41,8 @@ abstract class AndroidHelper {
         // Look for the required symbols.
         try {
           _mpv_lavc_set_java_vm = libmpv?.lookupFunction<
-              mpv_lavc_set_java_vmCXX, mpv_lavc_set_java_vmDart>(
-            'mpv_lavc_set_java_vm',
-          );
+              mpv_lavc_set_java_vmCXX,
+              mpv_lavc_set_java_vmDart>('mpv_lavc_set_java_vm');
         } catch (_) {}
         try {
           _av_jni_set_java_vm = libavcodec
@@ -58,34 +53,30 @@ abstract class AndroidHelper {
         try {
           _MediaKitAndroidHelperGetJavaVM =
               libmediakitandroidhelper?.lookupFunction<
-                  MediaKitAndroidHelperGetJavaVMCXX,
-                  MediaKitAndroidHelperGetJavaVMDart>(
-            'MediaKitAndroidHelperGetJavaVM',
-          );
+                      MediaKitAndroidHelperGetJavaVMCXX,
+                      MediaKitAndroidHelperGetJavaVMDart>(
+                  'MediaKitAndroidHelperGetJavaVM');
         } catch (_) {}
         try {
           MediaKitAndroidHelperGetFilesDir =
               libmediakitandroidhelper?.lookupFunction<
-                  MediaKitAndroidHelperGetFilesDirCXX,
-                  MediaKitAndroidHelperGetFilesDirDart>(
-            'MediaKitAndroidHelperGetFilesDir',
-          );
+                      MediaKitAndroidHelperGetFilesDirCXX,
+                      MediaKitAndroidHelperGetFilesDirDart>(
+                  'MediaKitAndroidHelperGetFilesDir');
         } catch (_) {}
         try {
           _MediaKitAndroidHelperIsEmulator =
               libmediakitandroidhelper?.lookupFunction<
-                  MediaKitAndroidHelperIsEmulatorCXX,
-                  MediaKitAndroidHelperIsEmulatorDart>(
-            'MediaKitAndroidHelperIsEmulator',
-          );
+                      MediaKitAndroidHelperIsEmulatorCXX,
+                      MediaKitAndroidHelperIsEmulatorDart>(
+                  'MediaKitAndroidHelperIsEmulator');
         } catch (_) {}
         try {
           _MediaKitAndroidHelperGetAPILevel =
               libmediakitandroidhelper?.lookupFunction<
-                  MediaKitAndroidHelperGetAPILevelCXX,
-                  MediaKitAndroidHelperGetAPILevelDart>(
-            'MediaKitAndroidHelperGetAPILevel',
-          );
+                      MediaKitAndroidHelperGetAPILevelCXX,
+                      MediaKitAndroidHelperGetAPILevelDart>(
+                  'MediaKitAndroidHelperGetAPILevel');
         } catch (_) {}
 
         if ((_mpv_lavc_set_java_vm ?? _av_jni_set_java_vm) == null) {

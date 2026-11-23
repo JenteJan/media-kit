@@ -5,6 +5,7 @@
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 import 'dart:ffi';
 import 'dart:collection';
+
 import 'package:synchronized/synchronized.dart';
 // ignore_for_file: unused_import, implementation_imports
 import 'package:media_kit/ffi/ffi.dart';

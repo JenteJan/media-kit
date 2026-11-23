@@ -15,9 +15,7 @@ import 'package:media_kit_video/media_kit_video_controls/src/controls/widgets/vi
 ///
 /// {@endtemplate}
 Widget CupertinoVideoControls(VideoState state) {
-  return const VideoControlsThemeDataInjector(
-    child: _CupertinoVideoControls(),
-  );
+  return const VideoControlsThemeDataInjector(child: _CupertinoVideoControls());
 }
 
 /// Default [CupertinoVideoControlsThemeData].
