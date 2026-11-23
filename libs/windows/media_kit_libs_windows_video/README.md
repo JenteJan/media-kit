@@ -18,7 +18,7 @@ The video plugin uses the headers in `include/mpv` to compile.
 The linker uses `libmpv.dll.a`.
 Flutter places `libmpv-2.dll` beside the application executable.
 
-See the [libmpv releases](https://github.com/Carapacik/libmpv-win32-video-cmake/releases) for the SDK archives.
+See the [libmpv releases](https://github.com/media-kit/libmpv-win32-video-cmake/releases) for the SDK archives.
 
 ## License
 

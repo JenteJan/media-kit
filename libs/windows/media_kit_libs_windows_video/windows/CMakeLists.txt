@@ -72,13 +72,13 @@ if("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-x64")
   set(LIBMPV_ARCH "x86_64")
   set(
     LIBMPV_SHA256
-    "558c47ce08d39bd27d060363c57907604fde7c6d5f7b09e50dc7b04da2a46300"
+    "437191bc801cd6f9f87c24e79a7f4afd117d07f609d196184a031634bcc1dcd3"
   )
 elseif("${FLUTTER_TARGET_PLATFORM}" STREQUAL "windows-arm64")
   set(LIBMPV_ARCH "aarch64")
   set(
     LIBMPV_SHA256
-    "2af0781b6e90dbcdea912437136d7541cffa45b29af535475ed1ad6176b0d786"
+    "872992724225bc772353546acdc5ff0194f9d9013feb8b1960a7b7c76bbed738"
   )
 else()
   message(
@@ -94,7 +94,7 @@ set(
 )
 set(
   LIBMPV_URL
-  "https://github.com/Carapacik/libmpv-win32-video-cmake/releases/download/${LIBMPV_RELEASE}/${LIBMPV}"
+  "https://github.com/media-kit/libmpv-win32-video-cmake/releases/download/${LIBMPV_RELEASE}/${LIBMPV}"
 )
 
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
