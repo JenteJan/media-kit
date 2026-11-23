@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:image/image.dart';
@@ -74,6 +75,23 @@ void nativeEnsureInitialized({String? libmpv}) {
   });
 }
 
+/// Calls [generated.MPV.mpv_terminate_destroy] from a short-lived isolate.
+///
+/// On Windows, libmpv calls `CoUninitialize` on the thread that destroys the
+/// player, without having called `CoInitializeEx` on that thread. Destroying
+/// the player from the platform thread takes away one of the COM references
+/// held by that thread (by the runner & by other plugins).
+///
+/// This is a top-level function, so that the closure sent to the isolate
+/// captures nothing but its two arguments.
+void _terminateDestroyInBackground(String libmpv, int address) {
+  Isolate.run(() {
+    generated.MPV(DynamicLibrary.open(libmpv)).mpv_terminate_destroy(
+      Pointer<generated.mpv_handle>.fromAddress(address),
+    );
+  });
+}
+
 /// {@template native_player}
 ///
 /// NativePlayer
@@ -115,6 +133,13 @@ class NativePlayer extends PlatformPlayer {
         } finally {
           Initializer(mpv).dispose(ctx);
           Future.delayed(const Duration(seconds: 5), () {
+            if (Platform.isWindows) {
+              // libmpv calls CoUninitialize on the thread that destroys the
+              // player, which must not be the platform thread. See:
+              // https://github.com/media-kit/media-kit/issues/1449
+              _terminateDestroyInBackground(NativeLibrary.path, ctx.address);
+              return;
+            }
             mpv.mpv_terminate_destroy(ctx);
           });
         }
