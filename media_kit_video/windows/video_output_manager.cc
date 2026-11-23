@@ -44,6 +44,27 @@ void VideoOutputManager::SetSize(int64_t handle,
   });
 }
 
+void VideoOutputManager::SetHdr(int64_t handle,
+                                bool enabled,
+                                HWND window,
+                                std::function<void(bool)> completion) {
+  operations_->Post([=]() {
+    auto output = video_outputs_.find(handle);
+    completion(output != video_outputs_.end() &&
+               output->second->SetHdr(enabled, window));
+  });
+}
+
+void VideoOutputManager::SetHdrPaperWhite(int64_t handle,
+                                          float nits,
+                                          HWND window) {
+  operations_->Post([=]() {
+    auto output = video_outputs_.find(handle);
+    if (output != video_outputs_.end())
+      output->second->SetHdrPaperWhite(nits, window);
+  });
+}
+
 void VideoOutputManager::Dispose(int64_t handle,
                                  std::function<void()> completion) {
   operations_->Post([=]() {

@@ -23,7 +23,12 @@ class D3D11SurfaceManager {
 
   explicit D3D11SurfaceManager(IDXGIAdapter* adapter);
   ID3D11Device* device() const { return device_.Get(); }
-  std::shared_ptr<Surface> CreateSurface(int width, int height) const;
+  // |format| is B8G8R8A8_UNORM, or R16G16B16A16_FLOAT for HDR output.
+  std::shared_ptr<Surface> CreateSurface(
+      int width,
+      int height,
+      DXGI_FORMAT format = DXGI_FORMAT_B8G8R8A8_UNORM,
+      bool shared = true) const;
   void WaitForWrites();
 
  private:

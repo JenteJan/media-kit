@@ -42,18 +42,23 @@ D3D11SurfaceManager::D3D11SurfaceManager(IDXGIAdapter* adapter) {
 }
 
 std::shared_ptr<D3D11SurfaceManager::Surface>
-D3D11SurfaceManager::CreateSurface(int width, int height) const {
+D3D11SurfaceManager::CreateSurface(int width,
+                                   int height,
+                                   DXGI_FORMAT format,
+                                   bool shared) const {
   D3D11_TEXTURE2D_DESC desc{};
   desc.Width = width;
   desc.Height = height;
-  desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  desc.Format = format;
   desc.ArraySize = desc.MipLevels = desc.SampleDesc.Count = 1;
   desc.Usage = D3D11_USAGE_DEFAULT;
   desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-  desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+  desc.MiscFlags = shared ? D3D11_RESOURCE_MISC_SHARED : 0;
   auto surface = std::make_shared<Surface>();
   Check(device_->CreateTexture2D(&desc, nullptr, &surface->texture),
         "CreateTexture2D");
+  if (!shared)
+    return surface;
   Microsoft::WRL::ComPtr<IDXGIResource> resource;
   Check(surface->texture.As(&resource), "Query IDXGIResource");
   Check(resource->GetSharedHandle(&surface->handle), "GetSharedHandle");

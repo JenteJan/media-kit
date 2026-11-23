@@ -40,6 +40,9 @@ class MediaKitVideoPlugin : public flutter::Plugin {
   // Posts callbacks to the platform thread independently of any Flutter view.
   void RunOnMainThread(std::function<void()> task);
 
+  // The top-level window of the Flutter view, or null without one.
+  HWND Window() const;
+
   flutter::PluginRegistrarWindows* registrar_ = nullptr;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_ =
       nullptr;

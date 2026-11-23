@@ -63,6 +63,12 @@ MediaKitVideoPlugin::~MediaKitVideoPlugin() {
   platform_tasks_.Close();
 }
 
+HWND MediaKitVideoPlugin::Window() const {
+  if (!registrar_->GetView())
+    return nullptr;
+  return ::GetAncestor(registrar_->GetView()->GetNativeWindow(), GA_ROOT);
+}
+
 void MediaKitVideoPlugin::RunOnMainThread(std::function<void()> task) {
   if (shutting_down_) {
     return;
@@ -164,6 +170,31 @@ void MediaKitVideoPlugin::HandleMethodCall(
     video_output_manager_->Dispose(handle_value, [this, response]() {
       RunOnMainThread([response]() { response->Success(); });
     });
+  } else if (method_call.method_name().compare(
+                 "VideoOutputManager.SetHdrPaperWhite") == 0) {
+    auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
+    auto handle =
+        std::get<std::string>(arguments[flutter::EncodableValue("handle")]);
+    auto nits = std::get<double>(arguments[flutter::EncodableValue("nits")]);
+    video_output_manager_->SetHdrPaperWhite(
+        static_cast<int64_t>(std::stoll(handle.c_str())),
+        static_cast<float>(nits), Window());
+    result->Success(flutter::EncodableValue(std::monostate{}));
+  } else if (method_call.method_name().compare("VideoOutputManager.SetHdr") ==
+             0) {
+    auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
+    auto handle =
+        std::get<std::string>(arguments[flutter::EncodableValue("handle")]);
+    auto enabled = std::get<bool>(arguments[flutter::EncodableValue("enabled")]);
+    auto response =
+        std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>(
+            std::move(result));
+    video_output_manager_->SetHdr(
+        static_cast<int64_t>(std::stoll(handle.c_str())), enabled, Window(),
+        [this, response](bool ok) {
+          RunOnMainThread(
+              [response, ok]() { response->Success(flutter::EncodableValue(ok)); });
+        });
   } else if (method_call.method_name().compare("VideoOutputManager.SetSize") ==
              0) {
     auto arguments = std::get<flutter::EncodableMap>(*method_call.arguments());

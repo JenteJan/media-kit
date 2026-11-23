@@ -23,6 +23,8 @@ set(LIBMPV_IMPORT_LIBRARY "${LIBMPV_SRC}/libmpv.dll.a")
 set(PLUGIN_SOURCES)
 if(MEDIA_KIT_LIBS_AVAILABLE)
   list(APPEND PLUGIN_SOURCES
+    "d3d11_hdr_encoder.cc"
+    "d3d11_hdr_encoder.h"
     "d3d11_surface_manager.cc"
     "d3d11_surface_manager.h"
     "media_kit_video_plugin.cc"

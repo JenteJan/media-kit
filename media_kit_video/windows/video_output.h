@@ -24,6 +24,7 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
+#include "d3d11_hdr_encoder.h"
 #include "d3d11_surface_manager.h"
 #include "thread_pool.h"
 #include "video_frame_size.h"
@@ -66,9 +67,24 @@ class VideoOutput {
   // The rendering worker resizes and redraws the frame even during pause.
   void SetSize(std::optional<int64_t> width, std::optional<int64_t> height);
 
+  // HDR output (see |D3D11HdrEncoder|): only with D3D11 rendering on an
+  // engine that exports FlutterDesktopEngineSupportsHdr. |window| is the
+  // Flutter window, whose display's luminance sets the brightness. Waits for
+  // the rendering worker; returns whether the output is now in the requested
+  // mode.
+  bool SetHdr(bool enabled, HWND window);
+
+  // Where an HDR film's paper white (BT.2408 reference white) is drawn, in
+  // nits. 203 shows the film as mastered; higher brightens the whole picture
+  // for a bright room, highlights getting what headroom the panel has left.
+  // Kept while SDR, applied whenever HDR is on.
+  void SetHdrPaperWhite(float nits, HWND window);
+
  private:
   struct Frame {
     media_kit::VideoFrameSize size;
+    // Half-float surfaces with extended sRGB for HDR, else BGRA.
+    bool hdr = false;
     std::shared_ptr<D3D11SurfaceManager::Surface> first_target;
     // The rendering worker publishes latest atomically.
     // Only the Flutter raster thread uses imported and the GPU descriptor.
@@ -84,6 +100,19 @@ class VideoOutput {
     std::shared_ptr<Frame> frame;
     std::unique_ptr<flutter::TextureVariant> variant;
   };
+
+  // Whether mpv has a new frame, or the current one has to be drawn again
+  // (a new texture, a new size, a new HDR level). mpv also calls back without
+  // a new frame, about twice per frame while a film plays; drawing on each
+  // repeated the whole shader chain and Flutter's compositing.
+  bool NeedsRender();
+
+  // Points mpv's tone mapping at the headroom the display has above the
+  // user's SDR brightness, and sets |hdr_scale_|. Rendering worker only.
+  void ApplyHdrBrightness();
+
+  // |SetHdr| on the rendering worker.
+  bool SwitchHdr(bool enabled, HWND window);
 
   void RetireTexture();
   void CleanUp();
@@ -117,6 +146,21 @@ class VideoOutput {
   bool render_queued_ = false;  // Protected by notification_mutex_.
   std::atomic<bool> destroyed_{false};
   std::unique_ptr<D3D11SurfaceManager> surface_manager_;
+  // The current frame must be drawn even without a new one from mpv.
+  bool redraw_ = true;
+  // HDR state; rendering worker only.
+  bool hdr_ = false;
+  HWND window_ = nullptr;
+  std::unique_ptr<D3D11HdrEncoder> hdr_encoder_;
+  // mpv's linear light, before the encode pass.
+  std::shared_ptr<D3D11SurfaceManager::Surface> hdr_source_;
+  media_kit::VideoFrameSize hdr_source_size_{0, 0};
+  float hdr_scale_ = 1.0f;
+  float hdr_paper_white_ = 203.0f;
+  // Frames since |ApplyHdrBrightness| last looked at the display.
+  int hdr_frames_ = 0;
+  // The target-peak last handed to mpv, in mpv's nits; 0 for none.
+  int hdr_target_peak_ = 0;
   bool software_ = false;
   int software_rotation_ = 0;
   std::vector<uint8_t> unrotated_pixels_;

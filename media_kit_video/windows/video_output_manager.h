@@ -40,6 +40,16 @@ class VideoOutputManager {
                std::optional<int64_t> width,
                std::optional<int64_t> height);
 
+  // HDR output for this handle (see |VideoOutput::SetHdr|). The completion
+  // gets whether the output is now in the requested mode, on the control
+  // worker.
+  void SetHdr(int64_t handle,
+              bool enabled,
+              HWND window,
+              std::function<void(bool)> completion);
+
+  void SetHdrPaperWhite(int64_t handle, float nits, HWND window);
+
   // Destroy the output for this handle.
   void Dispose(int64_t handle, std::function<void()> completion);
 
