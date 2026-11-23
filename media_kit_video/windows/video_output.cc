@@ -250,6 +250,16 @@ void VideoOutput::NotifyRender() {
 
 void VideoOutput::Render() {
   if (texture_id_) {
+    // mpv calls back for more than new frames (about twice per frame while
+    // a film plays). Rendering and telling Flutter on every call drew each
+    // frame twice: twice the GL work, the driver's, Flutter's compositing
+    // and the window's present. Only a new frame, or a surface that was just
+    // (re)made and is still empty, is worth drawing.
+    const auto flags = mpv_render_context_update(render_context_);
+    if (!(flags & MPV_RENDER_UPDATE_FRAME) && !redraw_pending_) {
+      return;
+    }
+    redraw_pending_ = false;
     // H/W
     if (surface_manager_ != nullptr) {
       surface_manager_->Draw([&]() {
@@ -431,6 +441,7 @@ void VideoOutput::Resize(int64_t required_width, int64_t required_height) {
         std::make_pair(texture_id_, std::move(texture_variant)));
     // Notify public texture update callback.
     texture_update_callback_(texture_id_, required_width, required_height);
+    redraw_pending_ = true;
   }
   // S/W
   if (pixel_buffer_ != nullptr) {
@@ -461,6 +472,7 @@ void VideoOutput::Resize(int64_t required_width, int64_t required_height) {
         std::make_pair(texture_id_, std::move(texture_variant)));
     // Notify public texture update callback.
     texture_update_callback_(texture_id_, required_width, required_height);
+    redraw_pending_ = true;
   }
 }
 
