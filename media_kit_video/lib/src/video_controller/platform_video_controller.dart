@@ -46,6 +46,17 @@ abstract class PlatformVideoController {
   /// * “With great power comes great responsibility”
   Future<void> setSize({int? width, int? height});
 
+  /// Gets the video output ready for a video of [width] x [height] before it
+  /// is opened, where the platform needs that.
+  ///
+  /// On Android the output surface is made at the video's size, and making
+  /// it once the video is known restarts the video decoder - for a stream,
+  /// a second seek and decode before the first picture. Given the size the
+  /// caller already knows (e.g. from the server's metadata), the surface is
+  /// in place when the file opens and nothing restarts. A different real
+  /// size only means the surface is made again, as without this call.
+  Future<void> prepareVideoSize(int width, int height) async {}
+
   /// A [Future] that completes when the first video frame has been rendered.
   Future<void> get waitUntilFirstFrameRendered =>
       waitUntilFirstFrameRenderedCompleter.future;

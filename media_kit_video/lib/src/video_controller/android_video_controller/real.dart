@@ -79,9 +79,10 @@ class AndroidVideoController extends PlatformVideoController {
         if (configuration.vo == 'mediacodec_embed') 'vid': vidValue,
       });
       // Instead of seeking to the start (Duration.zero), seek to the current playback position
-      // without jumping the user to the start of the media.
+      // without jumping the user to the start of the media. Nothing to seek
+      // in when the surface was prepared before a file opened.
       final currentPosition = player.state.position;
-      if (_disposed) {
+      if (_disposed || _preparing) {
         return;
       }
       await player.seek(currentPosition);
@@ -110,33 +111,81 @@ class AndroidVideoController extends PlatformVideoController {
           height = event.dw ?? 0;
         }
 
-        final isZero = width == 0 || height == 0;
-        final isSame = width == rect.value?.width.toInt() &&
-            height == rect.value?.height.toInt();
-        if (isZero || isSame) {
+        if (!await _applySize(width, height)) {
           return;
         }
-
-        final handle = await player.handle;
-
-        await _channel.invokeMethod('VideoOutputManager.SetSurfaceSize', {
-          'handle': handle.toString(),
-          'width': width.toString(),
-          'height': height.toString(),
-        });
-
-        rect.value = Rect.fromLTWH(
-          0.0,
-          0.0,
-          width.toDouble(),
-          height.toDouble(),
-        );
 
         if (!waitUntilFirstFrameRenderedCompleter.isCompleted) {
           waitUntilFirstFrameRenderedCompleter.complete();
         }
       }),
     );
+  }
+
+  /// Resizes the output surface to [width] x [height]; false when there was
+  /// nothing to do. Called with [lock] held.
+  Future<bool> _applySize(int width, int height) async {
+    final isZero = width == 0 || height == 0;
+    final isSame = width == rect.value?.width.toInt() &&
+        height == rect.value?.height.toInt();
+    if (isZero || isSame || _disposed) {
+      return false;
+    }
+
+    final handle = await player.handle;
+
+    await _channel.invokeMethod('VideoOutputManager.SetSurfaceSize', {
+      'handle': handle.toString(),
+      'width': width.toString(),
+      'height': height.toString(),
+    });
+
+    rect.value = Rect.fromLTWH(
+      0.0,
+      0.0,
+      width.toDouble(),
+      height.toDouble(),
+    );
+    return true;
+  }
+
+  /// Whether the surface is being made ahead of a file, see [prepareVideoSize].
+  bool _preparing = false;
+
+  @override
+  Future<void> prepareVideoSize(int width, int height) async {
+    if (_disposed || width <= 0 || height <= 0) {
+      return;
+    }
+    final before = wid.value;
+    final arrived = Completer<void>();
+    void onWid() {
+      if (!arrived.isCompleted) arrived.complete();
+    }
+
+    wid.addListener(onWid);
+    try {
+      _preparing = true;
+      final changed = await lock.synchronized(() => _applySize(width, height));
+      if (!changed) {
+        return;
+      }
+      // The new surface comes back from the platform side as a new --wid;
+      // the file must not open before mpv has it.
+      if (wid.value == before) {
+        await arrived.future.timeout(
+          const Duration(seconds: 1),
+          onTimeout: () {},
+        );
+      }
+      // [widListener] queued its work on [lock] when the --wid arrived.
+      await lock.synchronized(() {});
+    } finally {
+      _preparing = false;
+      if (!_disposed) {
+        wid.removeListener(onWid);
+      }
+    }
   }
 
   /// {@macro android_video_controller}
