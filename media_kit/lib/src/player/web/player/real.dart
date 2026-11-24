@@ -76,6 +76,7 @@ class WebPlayer extends PlatformPlayer {
       // --------------------------------------------------
       // Event streams handling:
       element.onPlay.listen((_) {
+        _wantPlaying = true;
         lock.synchronized(() async {
           // PlayerState.state.playing & PlayerState.stream.playing
           state = state.copyWith(playing: true);
@@ -85,13 +86,22 @@ class WebPlayer extends PlatformPlayer {
         });
       });
       element.onPause.listen((_) {
-        lock.synchronized(() async {
-          // PlayerState.state.playing & PlayerState.stream.playing
-          state = state.copyWith(playing: false);
-          if (!playingController.isClosed) {
-            playingController.add(false);
-          }
-        });
+        // Paused by leaving the document while being moved: see
+        // [_resumeWhenAttached]. The event is queued, so the element can
+        // already be back in the document by the time it is seen: any pause
+        // nobody asked for while playing was wanted is taken as a move, a few
+        // times in a row at most.
+        final now = DateTime.now();
+        if (now.difference(_movePausesSince) > const Duration(seconds: 3)) {
+          _movePausesSince = now;
+          _movePauses = 0;
+        }
+        if (_wantPlaying && !element.ended && ++_movePauses <= 4) {
+          _resumeWhenAttached();
+          return;
+        }
+        // PlayerState.state.playing & PlayerState.stream.playing
+        _reportPaused();
       });
       element.onPlaying.listen((_) {
         lock.synchronized(() async {
@@ -299,6 +309,7 @@ class WebPlayer extends PlatformPlayer {
       // To match NativePlayer behavior.
 
       await pause(synchronized: false);
+      _reattachTimer?.cancel();
 
       state = state.copyWith(
         track: state.track.copyWith(video: VideoTrack.no()),
@@ -373,6 +384,7 @@ class WebPlayer extends PlatformPlayer {
       // Restore original state & reset public [PlayerState] & [PlayerStream] values e.g. width=null, height=null, subtitle=['', ''] etc.
       await stop(open: true, synchronized: false);
 
+      _wantPlaying = false;
       element.pause();
       // Enter paused state.
       // NOTE: Handled as part of [stop] logic.
@@ -394,6 +406,7 @@ class WebPlayer extends PlatformPlayer {
       _loadSource(state.playlist.medias[state.playlist.index]);
 
       if (play) {
+        _wantPlaying = true;
         element.play().toDart.catchError((error) {
           final e = error as web.DOMException;
           if (!errorController.isClosed) {
@@ -429,6 +442,8 @@ class WebPlayer extends PlatformPlayer {
       await waitForPlayerInitialization;
       await waitForVideoControllerInitializationIfAttached;
 
+      _wantPlaying = false;
+      _reattachTimer?.cancel();
       element.innerHTML = ''.toJS;
       state = state.copyWith(track: Track());
       if (!trackController.isClosed) {
@@ -538,6 +553,11 @@ class WebPlayer extends PlatformPlayer {
       }
       await waitForPlayerInitialization;
       await waitForVideoControllerInitializationIfAttached;
+      _wantPlaying = true;
+      if (!element.isConnected && element.paused && _reattachTimer?.isActive == true) {
+        // Still being moved: it plays once it is back.
+        return;
+      }
       element.play().toDart.catchError((error) {
         // PlayerStream.error
         final e = error as web.DOMException;
@@ -563,7 +583,12 @@ class WebPlayer extends PlatformPlayer {
       }
       await waitForPlayerInitialization;
       await waitForVideoControllerInitializationIfAttached;
+      _wantPlaying = false;
+      _reattachTimer?.cancel();
       element.pause();
+      // A pause while the element was being moved already happened, so no
+      // pause event follows.
+      if (element.paused) _reportPaused();
     }
 
     if (synchronized) {
@@ -581,7 +606,7 @@ class WebPlayer extends PlatformPlayer {
       }
       await waitForPlayerInitialization;
       await waitForVideoControllerInitializationIfAttached;
-      if (element.paused) {
+      if (element.paused && !_wantPlaying) {
         await play(synchronized: false);
       } else {
         await pause(synchronized: false);
@@ -1568,6 +1593,51 @@ class WebPlayer extends PlatformPlayer {
 
   /// Whether the [Player] has been disposed.
   bool disposed = false;
+
+  /// Whether playback was asked for: by [open], [play] or the element itself
+  /// starting. A pause asked for, or one that is reported, clears it.
+  bool _wantPlaying = false;
+
+  /// Waits for the element to be back in the document after a move.
+  Timer? _reattachTimer;
+
+  /// Pauses taken as moves lately, so a browser that keeps pausing is
+  /// believed after a few tries.
+  int _movePauses = 0;
+  DateTime _movePausesSince = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// A browser pauses a media element the moment it leaves the document, even
+  /// when it is only being moved: a [Video] that is rebuilt elsewhere (a hero
+  /// flight into the player, a mini player) takes the one element along with
+  /// it. That pause was nobody's, so it is not reported; playback picks up
+  /// again once the element is back.
+  void _resumeWhenAttached() {
+    _reattachTimer?.cancel();
+    var ticks = 0;
+    _reattachTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (disposed || !_wantPlaying || ++ticks > 600) {
+        timer.cancel();
+        if (!disposed && _wantPlaying) _reportPaused();
+        return;
+      }
+      if (!element.isConnected) return;
+      timer.cancel();
+      element.play().toDart.catchError((error) {
+        _reportPaused();
+        return null;
+      });
+    });
+  }
+
+  void _reportPaused() {
+    _wantPlaying = false;
+    lock.synchronized(() async {
+      state = state.copyWith(playing: false);
+      if (!playingController.isClosed) {
+        playingController.add(false);
+      }
+    });
+  }
 
   /// Current subtitle blob URL to revoke when changing tracks or disposing.
   String? _subtitleBlobUrl;
