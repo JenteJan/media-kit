@@ -80,24 +80,24 @@ val downloadDependencies by tasks.registering {
 
         val filesToDownload = listOf(
             Triple(
-                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/default-arm64-v8a.jar",
-                "540af35cefe192b42fafb253f8ca6580",
-                layout.buildDirectory.file("v1.1.11/default-arm64-v8a.jar").get().asFile,
+                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/full-arm64-v8a.jar",
+                "86f2c8faeb66af1878b3a16f67831cb3",
+                layout.buildDirectory.file("v1.1.11/full-arm64-v8a.jar").get().asFile,
             ),
             Triple(
-                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/default-armeabi-v7a.jar",
-                "348ddcebec228bb53256ac980ea2bb84",
-                layout.buildDirectory.file("v1.1.11/default-armeabi-v7a.jar").get().asFile,
+                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/full-armeabi-v7a.jar",
+                "93542d40e44f3afad3aa773674e8eaa5",
+                layout.buildDirectory.file("v1.1.11/full-armeabi-v7a.jar").get().asFile,
             ),
             Triple(
-                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/default-x86_64.jar",
-                "d8d0b19a8bb673ab61f2808b2b9bf4fa",
-                layout.buildDirectory.file("v1.1.11/default-x86_64.jar").get().asFile,
+                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/full-x86_64.jar",
+                "44b7efdbaf3626d6b24afaf5d497a369",
+                layout.buildDirectory.file("v1.1.11/full-x86_64.jar").get().asFile,
             ),
             Triple(
-                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/default-x86.jar",
-                "19906a87efffbe994a0ca976ab577feb",
-                layout.buildDirectory.file("v1.1.11/default-x86.jar").get().asFile,
+                "https://github.com/media-kit/libmpv-android-video-build/releases/download/v1.1.11/full-x86.jar",
+                "e69a9bbd7fb587deb33dd10fecc2fecc",
+                layout.buildDirectory.file("v1.1.11/full-x86.jar").get().asFile,
             ),
         )
 
